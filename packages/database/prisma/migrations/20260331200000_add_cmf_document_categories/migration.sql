@@ -1,0 +1,3 @@
+-- Add CMF-specific DocumentCategory enum values
+ALTER TYPE "DocumentCategory" ADD VALUE IF NOT EXISTS 'BROADCASTER_COMMITMENT';
+ALTER TYPE "DocumentCategory" ADD VALUE IF NOT EXISTS 'DISTRIBUTION_COMMITMENT';

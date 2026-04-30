@@ -1,0 +1,37 @@
+{
+  "name": "@storyos/database",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
+    "migrate:prod": "dotenv -e ../../.env -- prisma migrate deploy",
+    "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "seed": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
+    "validate-program-config": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/scripts/validate-program-config.ts",
+    "verify:program-requirement-json": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/scripts/verify-program-requirement-json.ts",
+    "normalize:ca-provinces": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/scripts/normalize-canadian-province-state.ts",
+    "studio": "dotenv -e ../../.env -- prisma studio",
+    "build": "tsc && cp -r src/generated dist/src/",
+    "db:indexes": "dotenv -e ../../.env -- prisma db execute --file prisma/sql/partial_indexes.sql --schema prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "@storyos/types": "*",
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "dotenv-cli": "^7.4.2",
+    "prisma": "^6.4.1",
+    "typescript": "^5.7.2",
+    "ts-node": "^10.9.2",
+    "@types/node": "^22.10.5"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
+  }
+}

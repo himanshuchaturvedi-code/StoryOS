@@ -1,0 +1,83 @@
+"use strict";
+/**
+ * Temporal query helpers.
+ *
+ * CONVENTION FOR TEMPORAL ENTITIES (Phase 3+):
+ * Tables with record-validity semantics use:
+ *   effectiveFrom  DateTime   — when this record becomes valid (non-null)
+ *   effectiveTo    DateTime?  — when this record stops being valid (null = currently active)
+ *
+ * Applies to: ParticipantResidencyStatus, VendorEligibility, CorporateOwnership,
+ *             ProjectOwnership (Phase 3), RightsControlFact (Phase 3).
+ *
+ * OVERLAP PREVENTION:
+ * Enforce non-overlapping ranges at the DB level with an exclusion constraint.
+ * Example (run in a migration after enabling btree_gist):
+ *
+ *   CREATE EXTENSION IF NOT EXISTS btree_gist;
+ *
+ *   ALTER TABLE participant_residency_statuses
+ *     ADD CONSTRAINT no_overlapping_residency
+ *     EXCLUDE USING gist (
+ *       person_id        WITH =,
+ *       project_id       WITH =,
+ *       tstzrange(effective_from, effective_to, '[)') WITH &&
+ *     );
+ *
+ * NULL effectiveTo is treated as infinity in the range above.
+ * The application must replace NULL with a far-future date before inserting
+ * if using this constraint, OR use a partial index approach.
+ *
+ * USAGE:
+ *   import { asOf, currentlyEffective, activeDuring } from '@storyos/database';
+ *
+ *   // Current record for a person-project residency
+ *   const residency = await prisma.participantResidencyStatus.findFirst({
+ *     where: { personId, projectId, ...currentlyEffective() },
+ *   });
+ *
+ *   // Record valid on a specific past date (for submission snapshot evaluation)
+ *   const residencyAtSubmission = await prisma.participantResidencyStatus.findFirst({
+ *     where: { personId, projectId, ...asOf(submissionDate) },
+ *   });
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.asOf = asOf;
+exports.currentlyEffective = currentlyEffective;
+exports.activeDuring = activeDuring;
+exports.activeOn = activeOn;
+/**
+ * Returns a Prisma WHERE fragment that matches records valid at the given date.
+ * Default is the current timestamp.
+ */
+function asOf(date = new Date()) {
+    return {
+        effectiveFrom: { lte: date },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: date } }],
+    };
+}
+/**
+ * Shorthand for asOf(new Date()) — currently effective records.
+ */
+function currentlyEffective() {
+    return asOf(new Date());
+}
+/**
+ * For business date ranges (startDate / endDate on ProductionPhase,
+ * ProjectParticipantRole, etc.) where the semantics are "active during this period."
+ *
+ * Returns records that overlap with the given range.
+ */
+function activeDuring(rangeStart, rangeEnd) {
+    return {
+        startDate: { lte: rangeEnd },
+        OR: [{ endDate: null }, { endDate: { gte: rangeStart } }],
+    };
+}
+/**
+ * Records whose date range includes the given point.
+ */
+function activeOn(date) {
+    return activeDuring(date, date);
+}
+//# sourceMappingURL=temporal.js.map

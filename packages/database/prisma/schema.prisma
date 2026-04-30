@@ -1,0 +1,1894 @@
+// StoryOS — Phase 1 Prisma Schema
+// All tenant-scoped tables carry organizationId directly.
+// Soft delete: deletedAt TIMESTAMPTZ NULL on all mutable entity tables.
+// Temporal entities (Phase 3+) will add effectiveFrom / effectiveTo.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────
+// Enums
+// These mirror packages/types/src/enums/index.ts.
+// Keep in sync — both must be updated together.
+// ──────────────────────────────────────────
+
+enum OrgType {
+  PRODUCTION_COMPANY
+  AGENCY
+  DISTRIBUTOR
+  OTHER
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProjectRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum Stage {
+  DEVELOPMENT
+  PRE_PRODUCTION
+  PRODUCTION
+  POST_PRODUCTION
+  COMPLETED
+}
+
+enum PhaseType {
+  DEVELOPMENT
+  PRE_PRODUCTION
+  PRINCIPAL_PHOTOGRAPHY
+  POST_PRODUCTION
+  VFX
+  ANIMATION
+  SOUND_MIX
+  COLOR_GRADE
+  MUSIC
+  OTHER
+}
+
+enum FormatType {
+  FEATURE_FILM
+  TV_SERIES
+  TV_MOVIE
+  SHORT_FILM
+  DOCUMENTARY_FEATURE
+  DOCUMENTARY_SERIES
+  WEB_SERIES
+  ANIMATION_SERIES
+  ANIMATION_FEATURE
+  OTHER
+}
+
+enum RoleCategory {
+  ABOVE_THE_LINE
+  BELOW_THE_LINE
+  KEY_CREATIVE
+  CAST
+  OTHER
+}
+
+enum LocationType {
+  STUDIO
+  ON_LOCATION
+  OFFICE
+  POST_FACILITY
+  VFX_FACILITY
+  OTHER
+}
+
+enum DocumentCategory {
+  // ── General production documents ──
+  SCRIPT
+  BUDGET
+  SCHEDULE
+  CONTRACT
+  CHAIN_OF_TITLE
+  INSURANCE
+  FINANCING
+  CORPORATE
+  CORRESPONDENCE
+  // ── Certification artifacts (real documents users upload/receive) ──
+  CAVCO_PART_A // CAVCO advance ruling certificate
+  CAVCO_PART_B // CAVCO final certification certificate
+  ELIGIBILITY_CERTIFICATE // Provincial agency eligibility certificate (Ontario Creates, Creative BC, SODEC, etc.)
+  VFX_ACTIVITY_REPORT // Ontario Creates OCASE eligible activity report
+  TAX_CLAIM_FORM // CRA T2 Schedule / T1177 / provincial tax claim
+  COMPLETION_CERTIFICATE // Production completion / delivery certificate
+  BROADCASTER_COMMITMENT // Signed broadcaster licence / commitment letter (CMF)
+  DISTRIBUTION_COMMITMENT // Signed distribution agreement / commitment (CMF)
+  OTHER
+}
+
+// ── Phase 2: Financial enums ─────────────
+
+enum BudgetAccountType {
+  ABOVE_THE_LINE
+  BELOW_THE_LINE_PRODUCTION
+  BELOW_THE_LINE_POST
+  OTHER
+}
+
+enum CptcRole {
+  DIRECTOR
+  SCREENWRITER
+  LEAD_PERFORMER_1
+  LEAD_PERFORMER_2
+  DIRECTOR_OF_PHOTOGRAPHY
+  ART_DIRECTOR
+  MUSIC_COMPOSER
+  PICTURE_EDITOR
+}
+
+enum BudgetVersionStatus {
+  DRAFT
+  LOCKED
+}
+
+enum FinanceSourceType {
+  FEDERAL_TAX_CREDIT
+  PROVINCIAL_TAX_CREDIT
+  BROADCASTER_LICENSE
+  DISTRIBUTION_ADVANCE
+  PRE_SALE
+  EQUITY
+  GAP_FINANCING
+  GRANT
+  DEFERRAL
+  OTHER
+}
+
+enum FinanceSourceStatus {
+  ESTIMATED
+  COMMITTED
+  RECEIVED
+}
+
+// ── Phase 5: Budget Eligibility Annotation enums ─
+
+enum ExpenseType {
+  LABOUR
+  NON_LABOUR
+  MIXED
+}
+
+enum ActivityType {
+  GENERAL
+  DIGITAL_ANIMATION
+  VISUAL_EFFECTS
+  POST_PRODUCTION
+}
+
+// ── Phase 3: Eligibility / Activity enums ─
+
+enum VendorType {
+  PRODUCTION_SERVICE
+  POST_PRODUCTION
+  VFX
+  ANIMATION
+  SOUND
+  MUSIC
+  EQUIPMENT_RENTAL
+  STUDIO_RENTAL
+  CATERING
+  TRANSPORTATION
+  INSURANCE
+  LEGAL
+  OTHER
+}
+
+enum EligibilityStatus {
+  ELIGIBLE
+  NOT_ELIGIBLE
+  UNDER_REVIEW
+  EXPIRED
+}
+
+enum ControlType {
+  CREATIVE_CONTROL
+  FINANCIAL_CONTROL
+  COPYRIGHT_OWNERSHIP
+  DISTRIBUTION_RIGHTS
+  UNDERLYING_RIGHTS
+}
+
+enum ResidencyType {
+  CITIZEN
+  PERMANENT_RESIDENT
+  TEMPORARY_RESIDENT
+  NON_RESIDENT
+}
+
+// ── Phase 4: Program & Incentive Framework enums ─
+
+enum ProgramScope {
+  FEDERAL
+  PROVINCIAL
+  MUNICIPAL
+  PRIVATE_FUND
+  INTERNATIONAL
+}
+
+enum RequirementCategory {
+  EXPENDITURE_THRESHOLD
+  LABOUR_EXPENDITURE
+  KEY_CREATIVE_TEST
+  CANADIAN_CONTROL
+  PRODUCER_CREDIT
+  RESIDENCY_TEST
+  ACTIVITY_DAY_MINIMUM
+  REGIONAL_SPEND
+  FORMAT_ELIGIBILITY
+  VENDOR_ELIGIBILITY
+  RIGHTS_CONTROL
+  DOCUMENTATION
+  CUSTOM
+}
+
+enum FactSourceType {
+  EXPENSE_FACT
+  ACTIVITY_DAY
+  VENDOR_ELIGIBILITY
+  PARTICIPANT_RESIDENCY
+  CORPORATE_OWNERSHIP
+  PROJECT_OWNERSHIP
+  RIGHTS_CONTROL_FACT
+  BUDGET_ACTUAL
+  PROJECT_FORMAT
+  PROJECT_METADATA
+  DOCUMENT
+}
+
+enum ProjectProgramStatus {
+  ACTIVE
+  PAUSED
+  ABANDONED
+  COMPLETED
+}
+
+enum SubmissionStatus {
+  DRAFT
+  IN_REVIEW
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum AssessmentResult {
+  PASS
+  FAIL
+  PARTIAL
+  NOT_EVALUATED
+}
+
+enum EvaluationSource {
+  BUDGET
+  ACTUAL
+  BLENDED
+}
+
+enum EvidenceType {
+  FACT_QUERY
+  DOCUMENT
+  MANUAL_ENTRY
+}
+
+// ──────────────────────────────────────────
+// Users
+// Global — not tenant-scoped.
+// A user belongs to one or more organizations via OrganizationMember.
+// ──────────────────────────────────────────
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String?
+  firstName       String
+  lastName        String
+  avatarUrl       String?
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organizationMembers  OrganizationMember[]
+  invitationsSent      Invitation[]
+  projectsCreated      Project[]
+  projectAccess        ProjectAccess[]
+  documentsUploaded    Document[]
+  stageChangesRecorded ProjectStageHistory[]
+
+  @@map("users")
+}
+
+// ──────────────────────────────────────────
+// Organizations
+// The top-level tenant boundary.
+// ──────────────────────────────────────────
+
+model Organization {
+  id   String  @id @default(uuid())
+  name String
+  slug String  @unique
+  type OrgType @default(PRODUCTION_COMPANY)
+
+  // Contact
+  email   String?
+  phone   String?
+  website String?
+
+  // Legal
+  legalName          String?
+  registrationNumber String?
+
+  // Address — embedded; a separate address model is not warranted at this scale
+  streetLine1   String?
+  streetLine2   String?
+  city          String?
+  provinceState String?
+  postalCode    String?
+  country       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  members     OrganizationMember[]
+  invitations Invitation[]
+  projects    Project[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String  @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrgRole @default(MEMBER)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Invitation {
+  id             String           @id @default(uuid())
+  organizationId String
+  email          String
+  role           OrgRole          @default(MEMBER)
+  invitedById    String
+  token          String           @unique @default(uuid())
+  status         InvitationStatus @default(PENDING)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invitedBy    User         @relation(fields: [invitedById], references: [id])
+
+  @@index([email])
+  @@index([token])
+  @@index([organizationId, status])
+  @@map("invitations")
+}
+
+// ──────────────────────────────────────────
+// Projects
+// Tenant-scoped. Stage is a field (not a table) — current stage.
+// Stage transitions are tracked in ProjectStageHistory.
+// ──────────────────────────────────────────
+
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  title          String
+  status         ProjectStatus @default(DRAFT)
+  stage          Stage         @default(DEVELOPMENT)
+  createdById    String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  access       ProjectAccess[]
+  metadata     ProjectMetadata?
+  format       ProjectFormat?
+  stageHistory ProjectStageHistory[]
+  phases       ProductionPhase[]
+  milestones   ProjectMilestone[]
+  participants ProjectParticipant[]
+  locations    ProjectLocation[]
+  documents    Document[]
+  budgets      Budget[]
+  financePlans FinancePlan[]
+
+  // Phase 3 relations
+  activityDays           ActivityDay[]
+  activityPlans          ActivityPlan[]
+  expenseFacts           ExpenseFact[]
+  projectOwnerships      ProjectOwnership[]
+  rightsControlFacts     RightsControlFact[]
+  participantResidencies ParticipantResidencyStatus[]
+
+  // Phase 4 relations
+  projectPrograms ProjectProgram[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, deletedAt])
+  @@map("projects")
+}
+
+model ProjectAccess {
+  id             String      @id @default(uuid())
+  projectId      String
+  organizationId String
+  userId         String
+  role           ProjectRole @default(VIEWER)
+  createdById    String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("project_access")
+}
+
+model ProjectMetadata {
+  id             String  @id @default(uuid())
+  projectId      String  @unique
+  organizationId String
+  createdById    String?
+
+  logline          String?
+  synopsis         String?  @db.Text
+  genre            String?
+  language         String?
+  originalLanguage String?
+  targetAudience   String?
+  countryOfOrigin  String?
+  productionYear   Int?
+  keywords         String[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId])
+  @@map("project_metadata")
+}
+
+model ProjectFormat {
+  id             String  @id @default(uuid())
+  projectId      String  @unique
+  organizationId String
+  createdById    String?
+
+  formatType            FormatType
+  totalRuntimeMinutes   Int?
+  numberOfEpisodes      Int?
+  episodeRuntimeMinutes Int?
+  numberOfSeasons       Int?
+  seasonNumber          Int?
+  aspectRatio           String?
+  resolution            String?
+  isLiveAction          Boolean    @default(true)
+  hasAnimation          Boolean    @default(false)
+  animationPercentage   Int?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId])
+  @@map("project_formats")
+}
+
+// Immutable log of production stage transitions.
+// No soft delete — this is an append-only audit trail.
+model ProjectStageHistory {
+  id             String @id @default(uuid())
+  projectId      String
+  organizationId String
+
+  stage       Stage
+  enteredAt   DateTime  @default(now())
+  exitedAt    DateTime?
+  notes       String?
+  changedById String
+
+  createdAt DateTime @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id])
+  changedBy User    @relation(fields: [changedById], references: [id])
+
+  @@index([projectId])
+  @@index([organizationId])
+  @@map("project_stage_history")
+}
+
+model ProductionPhase {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  phaseType PhaseType
+  name      String?
+  startDate DateTime?
+  endDate   DateTime?
+  notes     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project          Project                  @relation(fields: [projectId], references: [id])
+  participantRoles ProjectParticipantRole[]
+  activityDays     ActivityDay[]
+  activityPlans    ActivityPlan[]
+  expenseFacts     ExpenseFact[]
+  budgetLines      BudgetLine[]
+
+  @@index([projectId])
+  @@index([organizationId])
+  @@map("production_phases")
+}
+
+model ProjectMilestone {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  name       String
+  dueDate    DateTime?
+  actualDate DateTime?
+  notes      String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([organizationId])
+  @@map("project_milestones")
+}
+
+// ──────────────────────────────────────────
+// People / Participants
+// Person is org-scoped (V1). Cross-org identity linking is deferred.
+// ParticipantRoleType is global reference data seeded with CAVCO-aligned codes.
+// ──────────────────────────────────────────
+
+model Person {
+  id             String  @id @default(uuid())
+  organizationId String
+  createdById    String?
+
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  citizenship String?
+  dateOfBirth DateTime?
+
+  // Address
+  streetLine1   String?
+  streetLine2   String?
+  city          String?
+  provinceState String?
+  postalCode    String?
+  country       String?
+
+  notes String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  participations    ProjectParticipant[]
+  activityDays      ActivityDay[]
+  expenseFacts      ExpenseFact[]
+  residencyStatuses ParticipantResidencyStatus[]
+  budgetLines       BudgetLine[]
+  loanOutVendors    Vendor[]                     @relation("VendorPrincipal")
+  auditLogs         PersonAuditLog[]
+
+  @@index([organizationId])
+  @@index([organizationId, lastName, firstName])
+  @@map("persons")
+}
+
+model PersonAuditLog {
+  id             String  @id @default(uuid())
+  personId       String
+  organizationId String
+  changedById    String?
+
+  fieldName String
+  oldValue  String?
+  newValue  String?
+
+  createdAt DateTime @default(now())
+
+  person Person @relation(fields: [personId], references: [id])
+
+  @@index([personId])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("person_audit_logs")
+}
+
+// Global reference data — no organizationId.
+// Seeded with CAVCO key creative position codes.
+// Phase 5 calculators will reference these codes by their canonical code value.
+model ParticipantRoleType {
+  id        String       @id @default(uuid())
+  code      String       @unique
+  name      String
+  category  RoleCategory @default(OTHER)
+  sortOrder Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments  ProjectParticipantRole[]
+  activityDays ActivityDay[]
+
+  @@map("participant_role_types")
+}
+
+model ProjectParticipant {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  personId       String
+  createdById    String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+  person  Person  @relation(fields: [personId], references: [id])
+
+  roles ProjectParticipantRole[]
+
+  @@unique([projectId, personId])
+  @@index([organizationId])
+  @@index([personId])
+  @@map("project_participants")
+}
+
+model ProjectParticipantRole {
+  id                   String  @id @default(uuid())
+  projectParticipantId String
+  organizationId       String
+  roleTypeId           String
+  productionPhaseId    String?
+
+  startDate DateTime?
+  endDate   DateTime?
+  notes     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  participant     ProjectParticipant  @relation(fields: [projectParticipantId], references: [id])
+  roleType        ParticipantRoleType @relation(fields: [roleTypeId], references: [id])
+  productionPhase ProductionPhase?    @relation(fields: [productionPhaseId], references: [id])
+
+  // One role type per participant per project. productionPhaseId is excluded
+  // from this constraint intentionally: NULL != NULL in Postgres unique indexes,
+  // so including a nullable column would silently allow duplicates when the
+  // phase is unset. Phase is scheduling context, not a role differentiator.
+  @@unique([projectParticipantId, roleTypeId])
+  @@index([organizationId])
+  @@index([projectParticipantId])
+  @@index([roleTypeId])
+  @@map("project_participant_roles")
+}
+
+// ──────────────────────────────────────────
+// Geography / Location
+// Org-scoped (V1). organizationId is required — no shared global registry.
+// country uses ISO 3166-1 alpha-2. provinceState uses ISO 3166-2.
+// Validated in the service layer, not enforced by the DB column type.
+// ──────────────────────────────────────────
+
+model Location {
+  id             String  @id @default(uuid())
+  organizationId String
+  createdById    String?
+
+  name                String
+  country             String
+  provinceState       String?
+  city                String?
+  postalCode          String?
+  locationType        LocationType @default(ON_LOCATION)
+  /// @deprecated use incentiveRegionCode instead
+  zoneCode            String?
+  incentiveRegionCode String?
+  latitude            Decimal?     @db.Decimal(10, 8)
+  longitude           Decimal?     @db.Decimal(11, 8)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  projectLocations ProjectLocation[]
+  activityDays     ActivityDay[]
+  activityPlans    ActivityPlan[]
+  expenseFacts     ExpenseFact[]
+  budgetLines      BudgetLine[]
+
+  @@index([organizationId])
+  @@index([organizationId, country, provinceState])
+  @@index([organizationId, incentiveRegionCode])
+  @@map("locations")
+}
+
+model ProjectLocation {
+  id             String @id @default(uuid())
+  projectId      String
+  organizationId String
+  locationId     String
+
+  isPrimary Boolean @default(false)
+  notes     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project  Project  @relation(fields: [projectId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@unique([projectId, locationId])
+  @@index([organizationId])
+  @@index([locationId])
+  @@map("project_locations")
+}
+
+// ──────────────────────────────────────────
+// Documents
+// Tenant-scoped. Storage key format enforced in DocumentsService:
+//   documents/{organizationId}/{projectId}/{documentId}/{fileName}
+// ──────────────────────────────────────────
+
+model Document {
+  id             String  @id @default(uuid())
+  organizationId String
+  projectId      String?
+  uploadedById   String
+
+  title      String
+  fileName   String
+  fileType   String
+  fileSize   Int
+  storageKey String
+  category   DocumentCategory @default(OTHER)
+  notes      String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project            Project?             @relation(fields: [projectId], references: [id])
+  uploadedBy         User                 @relation(fields: [uploadedById], references: [id])
+  rightsControlFacts RightsControlFact[]
+  submissionEvidence SubmissionEvidence[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("documents")
+}
+
+// ══════════════════════════════════════════
+// PHASE 2 — Financial Data Model
+// ══════════════════════════════════════════
+
+// ──────────────────────────────────────────
+// Budget Templates
+// Org-scoped reusable chart-of-accounts blueprints.
+// When a Budget is created from a template, BudgetTemplateAccount rows are
+// cloned into BudgetAccount rows. After creation, the budget's accounts are
+// independent of the template.
+// ──────────────────────────────────────────
+
+model BudgetTemplate {
+  id             String  @id @default(uuid())
+  organizationId String
+  createdById    String?
+
+  name        String
+  description String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  accounts BudgetTemplateAccount[]
+
+  @@index([organizationId])
+  @@map("budget_templates")
+}
+
+// Child of BudgetTemplate. No organizationId — inherits tenancy from the
+// template via onDelete: Cascade. No deletedAt — template accounts are
+// mutable blueprints, not audited records.
+model BudgetTemplateAccount {
+  id         String  @id @default(uuid())
+  templateId String
+  parentId   String?
+
+  code                        String
+  name                        String
+  accountType                 BudgetAccountType?
+  /// @deprecated Use BudgetTemplateAccountRoleMapping instead. Retained for backward compatibility.
+  cptcRole                    CptcRole?
+  defaultPhase                PhaseType?
+  defaultLabourClassification ExpenseType?
+  isHeader                    Boolean            @default(false)
+  sortOrder                   Int                @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  template BudgetTemplate          @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  parent   BudgetTemplateAccount?  @relation("TemplateAccountTree", fields: [parentId], references: [id])
+  children BudgetTemplateAccount[] @relation("TemplateAccountTree")
+
+  roleMappings BudgetTemplateAccountRoleMapping[]
+
+  @@unique([templateId, code])
+  @@index([templateId, parentId])
+  @@map("budget_template_accounts")
+}
+
+model BudgetTemplateAccountRoleMapping {
+  id                      String @id @default(uuid())
+  budgetTemplateAccountId String
+  programCode             String
+  roleCode                String
+  pointsOverride          Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  templateAccount BudgetTemplateAccount @relation(fields: [budgetTemplateAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetTemplateAccountId, programCode, roleCode])
+  @@index([budgetTemplateAccountId])
+  @@map("budget_template_account_role_mappings")
+}
+
+// ──────────────────────────────────────────
+// Budget
+// Project-scoped. A project may have multiple budgets (uncommon but valid).
+// baseCurrency is the reporting currency; individual lines may use other
+// currencies with baseCurrencyAmount for reconciliation.
+// ──────────────────────────────────────────
+
+model Budget {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  name         String
+  description  String?
+  baseCurrency String  @default("CAD")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project  Project         @relation(fields: [projectId], references: [id])
+  accounts BudgetAccount[]
+  versions BudgetVersion[]
+  actuals  ActualLine[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("budgets")
+}
+
+// ──────────────────────────────────────────
+// Budget Account (hierarchical chart of accounts)
+// Budget-scoped. Self-referencing parentId for adjacency-list tree.
+// isHeader distinguishes summary accounts (groups) from leaf accounts
+// that accept line items.
+// sourceTemplateAccountId is a denormalized provenance link — not a FK
+// because the template account can be deleted independently.
+// ──────────────────────────────────────────
+
+model BudgetAccount {
+  id             String  @id @default(uuid())
+  budgetId       String
+  organizationId String
+  parentId       String?
+
+  code                        String
+  name                        String
+  accountType                 BudgetAccountType?
+  /// @deprecated Use BudgetAccountRoleMapping instead. Retained for backward compatibility.
+  cptcRole                    CptcRole?
+  defaultPhase                PhaseType?
+  defaultLabourClassification ExpenseType?
+  isHeader                    Boolean            @default(false)
+  sortOrder                   Int                @default(0)
+  sourceTemplateAccountId     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  budget                   Budget                    @relation(fields: [budgetId], references: [id])
+  parent                   BudgetAccount?            @relation("AccountTree", fields: [parentId], references: [id])
+  children                 BudgetAccount[]           @relation("AccountTree")
+  lines                    BudgetLine[]
+  actuals                  ActualLine[]
+  submissionAccountSources SubmissionAccountSource[]
+  roleMappings             BudgetAccountRoleMapping[]
+
+  @@unique([budgetId, code])
+  @@index([organizationId])
+  @@index([budgetId, parentId])
+  @@map("budget_accounts")
+}
+
+model BudgetAccountRoleMapping {
+  id              String @id @default(uuid())
+  budgetAccountId String
+  programCode     String
+  roleCode        String
+  pointsOverride  Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account BudgetAccount @relation(fields: [budgetAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetAccountId, programCode, roleCode])
+  @@index([budgetAccountId])
+  @@map("budget_account_role_mappings")
+}
+
+// ──────────────────────────────────────────
+// Budget Version
+// Each version is a complete snapshot of budget lines.
+// Versions can be DRAFT (editable) or LOCKED (immutable, e.g. attached
+// to a submission). Lock is enforced in the service layer.
+// ──────────────────────────────────────────
+
+model BudgetVersion {
+  id             String  @id @default(uuid())
+  budgetId       String
+  organizationId String
+  createdById    String?
+
+  versionNumber Int
+  name          String
+  status        BudgetVersionStatus @default(DRAFT)
+  lockedAt      DateTime?
+  lockedById    String?
+  notes         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  budget Budget       @relation(fields: [budgetId], references: [id])
+  lines  BudgetLine[]
+
+  @@unique([budgetId, versionNumber])
+  @@index([organizationId])
+  @@index([budgetId])
+  @@map("budget_versions")
+}
+
+// ──────────────────────────────────────────
+// Budget Line
+// Intersection of BudgetVersion × BudgetAccount.
+// amount is the canonical dollar value (always present).
+// quantity and unitCost are optional formula inputs; when provided,
+// amount should equal quantity × unitCost (validated in the service).
+// fringeRate is metadata for Phase 5 incentive calculators.
+// Multiple lines per account per version is valid (e.g. "Prep fee",
+// "Shoot fee" under the same Director account).
+//
+// Eligibility annotation fields (Phase 5):
+// Financial fields (amount, quantity, unitCost, currency, fringeRate)
+// are immutable on LOCKED versions. Annotation fields below are editable
+// on both DRAFT and LOCKED versions via the /annotate endpoint.
+// See PART-A-CALCULATION-ARCHITECTURE.md §12.3.
+// ──────────────────────────────────────────
+
+model BudgetLine {
+  id              String @id @default(uuid())
+  budgetVersionId String
+  budgetAccountId String
+  organizationId  String
+
+  // Financial fields — locked with BudgetVersion
+  description String?
+  quantity    Decimal? @db.Decimal(14, 4)
+  unitCost    Decimal? @db.Decimal(14, 4)
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String   @default("CAD")
+  fringeRate  Decimal? @db.Decimal(5, 4)
+  notes       String?
+
+  // Eligibility annotation fields — editable on LOCKED versions
+  personId          String?
+  vendorId          String?
+  locationId        String?
+  productionPhaseId String?
+  labourAmount      Decimal?      @db.Decimal(14, 2)
+  expenseType       ExpenseType?
+  activityType      ActivityType?
+  isServiceContract Boolean?
+  /// True when this line is ineligible for tax credit calculations
+  /// (e.g. website costs, partial craft services, application fees for FIBC).
+  taxCreditIneligible       Boolean  @default(false)
+  /// Reason code for ineligibility (e.g. 'WEBSITE', 'CRAFT_SERVICES_50PCT', 'APPLICATION_FEE').
+  taxCreditIneligibleReason String?
+  sortOrder         Int           @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  version         BudgetVersion             @relation(fields: [budgetVersionId], references: [id])
+  account         BudgetAccount             @relation(fields: [budgetAccountId], references: [id])
+  person          Person?                   @relation(fields: [personId], references: [id])
+  vendor          Vendor?                   @relation(fields: [vendorId], references: [id])
+  location        Location?                 @relation(fields: [locationId], references: [id])
+  productionPhase ProductionPhase?          @relation(fields: [productionPhaseId], references: [id])
+  annotationLogs  BudgetLineAnnotationLog[]
+
+  @@index([organizationId])
+  @@index([budgetVersionId])
+  @@index([budgetAccountId])
+  @@index([personId])
+  @@index([vendorId])
+  @@index([locationId])
+  @@index([productionPhaseId])
+  @@map("budget_lines")
+}
+
+// ──────────────────────────────────────────
+// Budget Line Annotation Log
+// Audit trail for eligibility annotation changes, particularly on
+// LOCKED budget versions where financial fields are immutable.
+// Populated by the annotate() service method; only changed fields
+// produce log entries.
+// See PART-A-CALCULATION-ARCHITECTURE.md §12.3.
+// ──────────────────────────────────────────
+
+model BudgetLineAnnotationLog {
+  id             String @id @default(uuid())
+  budgetLineId   String
+  organizationId String
+  changedById    String
+
+  fieldName String
+  oldValue  Json?
+  newValue  Json?
+  changedAt DateTime @default(now())
+
+  budgetLine BudgetLine @relation(fields: [budgetLineId], references: [id])
+
+  @@index([budgetLineId])
+  @@index([organizationId])
+  @@index([changedAt])
+  @@map("budget_line_annotation_logs")
+}
+
+// ──────────────────────────────────────────
+// Actual Line
+// The canonical financial record (architecture guardrail #4).
+// Phase 5 expense_fact will reference ActualLine.id without duplicating
+// financial data.
+// References Budget + BudgetAccount — not a specific BudgetVersion,
+// because actuals exist independently of which version you compare against.
+// Reconciliation is computed at query time: SUM(BudgetLine.amount) vs
+// SUM(ActualLine.amount) per account.
+// ──────────────────────────────────────────
+
+model ActualLine {
+  id              String  @id @default(uuid())
+  budgetId        String
+  budgetAccountId String
+  organizationId  String
+  createdById     String?
+
+  description        String?
+  vendor             String?
+  invoiceRef         String?
+  amount             Decimal   @db.Decimal(14, 2)
+  currency           String    @default("CAD")
+  baseCurrencyAmount Decimal?  @db.Decimal(14, 2)
+  transactionDate    DateTime
+  postedDate         DateTime?
+  notes              String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  budget      Budget        @relation(fields: [budgetId], references: [id])
+  account     BudgetAccount @relation(fields: [budgetAccountId], references: [id])
+  expenseFact ExpenseFact?
+
+  @@index([organizationId])
+  @@index([budgetId])
+  @@index([budgetAccountId])
+  @@index([budgetId, transactionDate])
+  @@map("actual_lines")
+}
+
+// ──────────────────────────────────────────
+// Finance Plan
+// Project-scoped. The "sources" side of a production — where the money
+// comes from (vs. the budget, which is where it goes).
+// A project may have multiple plans (e.g. "Initial estimate", "Final closing").
+// ──────────────────────────────────────────
+
+model FinancePlan {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  name         String
+  baseCurrency String  @default("CAD")
+  notes        String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project         @relation(fields: [projectId], references: [id])
+  sources FinanceSource[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("finance_plans")
+}
+
+// ──────────────────────────────────────────
+// Finance Source
+// Individual funding instrument within a FinancePlan.
+// Tax credit estimates (FEDERAL/PROVINCIAL_TAX_CREDIT) start as ESTIMATED
+// and are refined by Phase 5 calculators. The finance plan's total should
+// equal or exceed the budget total.
+// ──────────────────────────────────────────
+
+model FinanceSource {
+  id             String @id @default(uuid())
+  financePlanId  String
+  organizationId String
+
+  sourceType FinanceSourceType
+  name       String
+  amount     Decimal             @db.Decimal(14, 2)
+  currency   String              @default("CAD")
+  status     FinanceSourceStatus @default(ESTIMATED)
+  conditions String?
+  notes      String?
+
+  /// 'labour' or 'general' — determines how this assistance reduces incentive bases.
+  /// Null defaults to 'general' in the calculation layer.
+  attributionType String?
+  /// 2-letter province code identifying the origin jurisdiction of this funding.
+  /// Used by province-filtered grinds (e.g. AB FTTC ignores out-of-province assistance).
+  originProvince  String?
+  /// Jurisdiction scope: 'federal', 'provincial', or null (unknown).
+  /// Federal sources (e.g. CMF, Telefilm) are always deducted in province-filtered grinds.
+  /// Provincial sources are only deducted when matching the spec's province.
+  /// Null = unknown origin, flagged as missingData in calculations.
+  originScope     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  plan FinancePlan @relation(fields: [financePlanId], references: [id])
+
+  @@index([organizationId])
+  @@index([financePlanId])
+  @@map("finance_sources")
+}
+
+// ══════════════════════════════════════════
+// PHASE 3 — Eligibility Fact Model
+// Prepares the canonical data layer for future incentive calculators.
+// No rule engines — only structured facts.
+// ══════════════════════════════════════════
+
+// ──────────────────────────────────────────
+// Vendor
+// Org-scoped. Represents a service company or supplier used in production.
+// The authoritative ownership determination comes from CorporateOwnership
+// chains; isCanadianOwned is a producer assertion for early flagging.
+// ──────────────────────────────────────────
+
+model Vendor {
+  id             String  @id @default(uuid())
+  organizationId String
+  createdById    String?
+
+  name              String
+  vendorType        VendorType
+  legalName         String?
+  registrationNum   String?
+  country           String
+  provinceState     String?
+  city              String?
+  postalCode        String?
+  isCanadianOwned   Boolean?
+  principalPersonId String?
+  isRelatedParty    Boolean?
+  notes             String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  principalPerson Person?             @relation("VendorPrincipal", fields: [principalPersonId], references: [id])
+  eligibilities   VendorEligibility[]
+  expenseFacts    ExpenseFact[]
+  budgetLines     BudgetLine[]
+
+  @@index([organizationId])
+  @@index([organizationId, vendorType])
+  @@index([principalPersonId])
+  @@map("vendors")
+}
+
+// ──────────────────────────────────────────
+// Vendor Eligibility (temporal)
+// Records whether a vendor is eligible for a specific program at a point
+// in time. programCode is free-text (e.g. "CAVCO", "OCASE") — not an FK,
+// because program tables don't exist until Phase 4.
+// Queried with asOf(date) from packages/database temporal helpers.
+// ──────────────────────────────────────────
+
+model VendorEligibility {
+  id             String @id @default(uuid())
+  vendorId       String
+  organizationId String
+
+  programCode      String
+  status           EligibilityStatus @default(UNDER_REVIEW)
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  certificationRef String?
+  notes            String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@index([organizationId])
+  @@index([vendorId])
+  @@index([vendorId, programCode])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("vendor_eligibilities")
+}
+
+// ──────────────────────────────────────────
+// Activity Day
+// Granular fact: "On this date, this person (in this role) worked at this
+// location during this production phase."
+// Required links: person, roleType, location, productionPhase, project,
+// activityDate — all captured for incentive rules.
+// activityDate uses @db.Date for timezone-safe day counting.
+// ──────────────────────────────────────────
+
+model ActivityDay {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  personId          String
+  roleTypeId        String
+  locationId        String
+  productionPhaseId String?
+
+  activityDate DateTime @db.Date
+  hoursWorked  Decimal? @db.Decimal(4, 1)
+  notes        String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project         Project             @relation(fields: [projectId], references: [id])
+  person          Person              @relation(fields: [personId], references: [id])
+  roleType        ParticipantRoleType @relation(fields: [roleTypeId], references: [id])
+  location        Location            @relation(fields: [locationId], references: [id])
+  productionPhase ProductionPhase?    @relation(fields: [productionPhaseId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId, activityDate])
+  @@index([projectId, locationId])
+  @@index([projectId, roleTypeId])
+  @@index([personId, activityDate])
+  @@index([locationId, activityDate])
+  @@index([productionPhaseId])
+  @@map("activity_days")
+}
+
+// Activity Plan (Part A)
+// Planned day counts by location × production phase for BUDGET-mode evaluation.
+model ActivityPlan {
+  id             String @id @default(uuid())
+  projectId      String
+  organizationId String
+
+  locationId        String
+  productionPhaseId String
+  plannedDays       Int
+  notes             String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project         Project         @relation(fields: [projectId], references: [id])
+  location        Location        @relation(fields: [locationId], references: [id])
+  productionPhase ProductionPhase @relation(fields: [productionPhaseId], references: [id])
+
+  @@unique([projectId, locationId, productionPhaseId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("activity_plans")
+}
+
+// ──────────────────────────────────────────
+// Expense Fact
+// Eligibility-annotated layer OVER ActualLine (architecture guardrail #4).
+// actualLineId is @@unique — 1:1 relationship. Financial data lives in
+// ActualLine only and is never duplicated here.
+// eligiblePortion (0.0–1.0) tells calculators what fraction of
+// ActualLine.amount qualifies for a given incentive context.
+// labourFlag / serviceFlag cover the dominant programme classification split.
+// ──────────────────────────────────────────
+
+model ExpenseFact {
+  id             String  @id @default(uuid())
+  actualLineId   String  @unique
+  organizationId String
+  projectId      String
+  createdById    String?
+
+  vendorId          String?
+  personId          String?
+  locationId        String?
+  productionPhaseId String?
+  budgetAccountId   String?
+
+  eligiblePortion Decimal @default(1.0) @db.Decimal(5, 4)
+  labourFlag      Boolean @default(false)
+  serviceFlag     Boolean @default(false)
+  notes           String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  actualLine      ActualLine       @relation(fields: [actualLineId], references: [id])
+  project         Project          @relation(fields: [projectId], references: [id])
+  vendor          Vendor?          @relation(fields: [vendorId], references: [id])
+  person          Person?          @relation(fields: [personId], references: [id])
+  location        Location?        @relation(fields: [locationId], references: [id])
+  productionPhase ProductionPhase? @relation(fields: [productionPhaseId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([vendorId])
+  @@index([personId])
+  @@index([locationId])
+  @@index([productionPhaseId])
+  @@map("expense_facts")
+}
+
+// ──────────────────────────────────────────
+// Corporate Ownership (temporal)
+// Models company → company ownership chains for Canadian-control tests.
+// Uses entity names (not FKs to a company table) because chains often
+// involve external entities the producer doesn't manage.
+// Phase 5 calculators traverse: project ownership → corporate chain → 
+// determine if Canadian individuals/entities hold ≥ threshold.
+// ──────────────────────────────────────────
+
+model CorporateOwnership {
+  id             String  @id @default(uuid())
+  organizationId String
+  createdById    String?
+
+  parentEntityName          String
+  parentEntityCountry       String
+  /// 2-letter province code for the parent entity.
+  parentEntityProvinceState String?
+  childEntityName           String
+  childEntityCountry        String
+  /// 2-letter province code for the child entity.
+  childEntityProvinceState  String?
+  ownershipPercentage       Decimal @db.Decimal(5, 2)
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  notes         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([organizationId])
+  @@index([childEntityName])
+  @@index([parentEntityName])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("corporate_ownerships")
+}
+
+// ──────────────────────────────────────────
+// Project Ownership (temporal)
+// Who holds equity in the production? Connects the corporate ownership
+// chain to a specific project. isProducer identifies the producing entity
+// for CAVCO's producer eligibility test.
+// ──────────────────────────────────────────
+
+model ProjectOwnership {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  entityName          String
+  entityCountry       String
+  /// 2-letter province code for the owning entity (e.g. 'AB').
+  /// Required for province-level ownership tests (FTTC elevated tier).
+  entityProvinceState String?
+  ownershipPercentage Decimal @db.Decimal(5, 2)
+  isProducer          Boolean @default(false)
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  notes         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("project_ownerships")
+}
+
+// ──────────────────────────────────────────
+// Rights Control Fact (temporal)
+// Control-test assertions: "Holder X holds creative/financial control of
+// this project." CAVCO and CMF require evidence of creative control
+// (final cut, location choice) and financial control (budget authority).
+// Each row is a timestamped assertion with optional document evidence.
+// ──────────────────────────────────────────
+
+model RightsControlFact {
+  id             String  @id @default(uuid())
+  projectId      String
+  organizationId String
+  createdById    String?
+
+  controlType   ControlType
+  holderName    String
+  holderCountry String
+  /// 2-letter province code for the rights holder (e.g. 'AB' for Alberta copyright).
+  holderProvinceState String?
+  /// For COPYRIGHT_OWNERSHIP: number of years the holder retains copyright.
+  /// AB FTTC elevated tier requires >= 10 years.
+  retentionYears      Int?
+  assertion     String
+  evidenceNotes String?
+  documentId    String?
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project  Project   @relation(fields: [projectId], references: [id])
+  document Document? @relation(fields: [documentId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([projectId, controlType])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("rights_control_facts")
+}
+
+// ──────────────────────────────────────────
+// Participant Residency Status (temporal, person-level)
+// Tracks a person's residency over time independent of any project.
+// CAVCO evaluates residency at the time of service, not at application.
+// Queried with asOf(serviceDate) from packages/database temporal helpers.
+// projectId / project are optional. Residency is person-scoped; create never requires project.
+// ──────────────────────────────────────────
+
+model ParticipantResidencyStatus {
+  id             String  @id @default(uuid())
+  personId       String
+  projectId      String?
+  organizationId String
+  createdById    String?
+
+  residencyType ResidencyType
+  country       String
+  provinceState String?
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  notes         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  person  Person   @relation(fields: [personId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId])
+  @@index([personId])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("participant_residency_statuses")
+}
+
+// ══════════════════════════════════════════
+// PHASE 4 — Program & Incentive Framework
+// Program metadata and configuration are global reference data.
+// Enrollment, submissions, evidence, and assessments are tenant-scoped.
+// No final credit calculations — that is Phase 5.
+// ══════════════════════════════════════════
+
+// ──────────────────────────────────────────
+// Program (global)
+// System-level reference data representing real-world government
+// incentives (CAVCO, PSTC, BC Tax Credit, etc.).
+// No organizationId, no deletedAt — admin-managed via isActive toggle.
+// V1: seeded via migration, read-only for tenants.
+// ──────────────────────────────────────────
+
+model Program {
+  id             String       @id @default(uuid())
+  code           String       @unique
+  name           String
+  scope          ProgramScope
+  country        String
+  provinceState  String?
+  administeredBy String
+  website        String?
+  description    String?      @db.Text
+  isActive       Boolean      @default(true)
+  sortOrder      Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions ProgramVersion[]
+
+  @@index([scope])
+  @@index([country])
+  @@map("programs")
+}
+
+// ──────────────────────────────────────────
+// Program Version (global, temporal)
+// Each version represents a set of rules effective over a date range.
+// "Current" is derived from effectiveFrom/effectiveTo, not a boolean.
+// ──────────────────────────────────────────
+
+model ProgramVersion {
+  id        String @id @default(uuid())
+  programId String
+
+  versionCode       String
+  name              String
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  description       String?   @db.Text
+  sourceDocumentUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  program         Program              @relation(fields: [programId], references: [id])
+  requirements    ProgramRequirement[]
+  projectPrograms ProjectProgram[]
+
+  @@unique([programId, versionCode])
+  @@index([programId])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("program_versions")
+}
+
+// ──────────────────────────────────────────
+// Program Requirement (global, hierarchical)
+// Parameterizes what a program tests. Each requirementCategory maps to
+// exactly one Phase 5 calculator function.
+// primaryFactSource is advisory metadata — calculators may query
+// multiple fact families as needed.
+// configuration JSONB holds typed parameters per category.
+// ──────────────────────────────────────────
+
+model ProgramRequirement {
+  id               String  @id @default(uuid())
+  programVersionId String
+  parentId         String?
+
+  code                String
+  name                String
+  description         String?             @db.Text
+  requirementCategory RequirementCategory
+  primaryFactSource   FactSourceType?
+  configuration       Json                @default("{}")
+  isRequired          Boolean             @default(true)
+  isBonusEligible     Boolean             @default(false)
+  sortOrder           Int                 @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  programVersion     ProgramVersion          @relation(fields: [programVersionId], references: [id])
+  parent             ProgramRequirement?     @relation("RequirementTree", fields: [parentId], references: [id])
+  children           ProgramRequirement[]    @relation("RequirementTree")
+  submissionEvidence SubmissionEvidence[]
+  assessments        RequirementAssessment[]
+
+  @@unique([programVersionId, code])
+  @@index([programVersionId])
+  @@index([programVersionId, requirementCategory])
+  @@map("program_requirements")
+}
+
+// ──────────────────────────────────────────
+// Project Program (tenant-scoped enrollment)
+// Represents intent: "this project targets CAVCO 2025."
+// Has its own lifecycle status independent of submissions.
+// ──────────────────────────────────────────
+
+model ProjectProgram {
+  id               String  @id @default(uuid())
+  projectId        String
+  organizationId   String
+  programVersionId String
+  createdById      String?
+
+  status               ProjectProgramStatus @default(ACTIVE)
+  targetSubmissionDate DateTime?
+  notes                String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project        Project             @relation(fields: [projectId], references: [id])
+  programVersion ProgramVersion      @relation(fields: [programVersionId], references: [id])
+  submissions    ProgramSubmission[]
+
+  @@unique([projectId, programVersionId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([organizationId, status])
+  @@map("project_programs")
+}
+
+// ──────────────────────────────────────────
+// Program Submission (tenant-scoped)
+// An attempt to submit evidence for a program enrollment.
+// evaluationDate is the canonical as-of date for all temporal lookups.
+// budgetVersionId must reference a LOCKED budget version.
+// ──────────────────────────────────────────
+
+model ProgramSubmission {
+  id               String  @id @default(uuid())
+  projectProgramId String
+  organizationId   String
+  createdById      String?
+
+  status           SubmissionStatus  @default(DRAFT)
+  evaluationDate   DateTime
+  budgetVersionId  String?
+  evaluationSource EvaluationSource?
+  isStale          Boolean           @default(false)
+  submittedAt      DateTime?
+  submittedById    String?
+  externalRef      String?
+  responseDate     DateTime?
+  notes            String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  projectProgram ProjectProgram            @relation(fields: [projectProgramId], references: [id])
+  evidence       SubmissionEvidence[]
+  assessments    RequirementAssessment[]
+  accountSources SubmissionAccountSource[]
+
+  @@index([organizationId])
+  @@index([projectProgramId])
+  @@index([organizationId, status])
+  @@map("program_submissions")
+}
+
+// ──────────────────────────────────────────
+// Submission Account Source (tenant-scoped)
+// Per-account source override for BLENDED evaluations.
+// When evaluationSource is BLENDED, each BudgetAccount can be evaluated
+// from either BUDGET or ACTUAL data. Accounts not listed default to BUDGET
+// (if budgetVersionId is set) or ACTUAL.
+// ──────────────────────────────────────────
+
+model SubmissionAccountSource {
+  id              String           @id @default(uuid())
+  submissionId    String
+  organizationId  String
+  budgetAccountId String
+  source          EvaluationSource
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submission    ProgramSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  budgetAccount BudgetAccount     @relation(fields: [budgetAccountId], references: [id])
+
+  @@unique([submissionId, budgetAccountId])
+  @@index([organizationId])
+  @@index([submissionId])
+  @@map("submission_account_sources")
+}
+
+// ──────────────────────────────────────────
+// Submission Evidence (tenant-scoped)
+// Links evidence to a requirement within a submission.
+// Multiple rows per requirement per submission are allowed.
+// manualPayload is Json for structured manual evidence data.
+// ──────────────────────────────────────────
+
+model SubmissionEvidence {
+  id             String @id @default(uuid())
+  submissionId   String
+  organizationId String
+  requirementId  String
+
+  evidenceType  EvidenceType
+  factSource    FactSourceType?
+  factQuery     Json?
+  documentId    String?
+  manualPayload Json?
+  notes         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  submission  ProgramSubmission  @relation(fields: [submissionId], references: [id])
+  requirement ProgramRequirement @relation(fields: [requirementId], references: [id])
+  document    Document?          @relation(fields: [documentId], references: [id])
+
+  @@index([organizationId])
+  @@index([submissionId])
+  @@index([submissionId, requirementId])
+  @@map("submission_evidence")
+}
+
+// ──────────────────────────────────────────
+// Requirement Assessment (tenant-scoped)
+// Records the evaluation result for a single requirement in a submission.
+// Override is a separate workflow concern: isOverridden + overrideResult
+// preserve the original computed result for audit.
+// calculatorCode + calculatorVersion enable auditability across releases.
+// ──────────────────────────────────────────
+
+model RequirementAssessment {
+  id             String @id @default(uuid())
+  submissionId   String
+  organizationId String
+  requirementId  String
+
+  result            AssessmentResult @default(NOT_EVALUATED)
+  computedValue     Json?
+  calculatorCode    String?
+  calculatorVersion String?
+  assessedAt        DateTime?
+  assessedById      String?
+  isAutoAssessed    Boolean          @default(false)
+
+  isOverridden   Boolean           @default(false)
+  overrideResult AssessmentResult?
+  overrideReason String?
+  overriddenById String?
+  overriddenAt   DateTime?
+
+  notes String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  submission  ProgramSubmission  @relation(fields: [submissionId], references: [id])
+  requirement ProgramRequirement @relation(fields: [requirementId], references: [id])
+
+  @@unique([submissionId, requirementId])
+  @@index([organizationId])
+  @@index([submissionId])
+  @@map("requirement_assessments")
+}
