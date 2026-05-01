@@ -14,6 +14,7 @@
     "db:migrate": "npm run migrate:dev --workspace=packages/database",
     "db:migrate:prod": "npm run migrate:prod --workspace=packages/database",
     "db:deploy": "npm run migrate:deploy --workspace=packages/database",
+    "db:deploy:railway": "npm run migrate:railway --workspace=@storyos/database",
     "db:seed": "npm run seed --workspace=packages/database",
     "validate-program-config": "npm run validate-program-config --workspace=packages/database",
     "db:studio": "npm run studio --workspace=packages/database",

@@ -9,6 +9,7 @@
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:prod": "dotenv -e ../../.env -- prisma migrate deploy",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "migrate:railway": "prisma migrate deploy --schema prisma/schema.prisma",
     "seed": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "validate-program-config": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/scripts/validate-program-config.ts",
     "verify:program-requirement-json": "dotenv -e ../../.env -- ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/scripts/verify-program-requirement-json.ts",
