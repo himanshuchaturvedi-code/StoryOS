@@ -1,0 +1,25 @@
+# Blueprint for Render — StoryOS API
+# Dashboard: New → Blueprint → paste this repo; or paste this file contents.
+#
+# After first deploy:
+# - Set DATABASE_URL, JWT_SECRET, ALLOWED_ORIGINS in the dashboard if not linked from Postgres.
+# - Run migrations locally: DATABASE_URL='...' npm run db:deploy:railway
+#
+# Docs: docs/RENDER_DEPLOY.md
+
+services:
+  - type: web
+    name: storyos-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT at runtime — do not set PORT here.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

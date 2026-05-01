@@ -1,6 +1,7 @@
-# StoryOS API on Railway — monorepo: NestJS (apps/api) + Prisma (packages/database)
+# StoryOS API — Docker deploy (Railway, Render, etc.)
+# Monorepo: NestJS (apps/api) + Prisma workspace (packages/database)
 #
-# Deploy this service from repo root (same directory as Dockerfile).
+# Build from repo root. Platform must set DATABASE_URL at runtime for Prisma migrations (run separately).
 FROM node:20-bookworm-slim
 
 WORKDIR /app
@@ -20,5 +21,5 @@ ENV NODE_ENV=production
 WORKDIR /app/apps/api
 EXPOSE 3001
 
-# Railway sets PORT; Nest uses process.env.PORT ?? 3001
+# Render/Railway set PORT at runtime; Nest uses process.env.PORT ?? 3001
 CMD ["node", "dist/apps/api/src/main.js"]

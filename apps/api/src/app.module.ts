@@ -29,11 +29,13 @@ import { ReferenceModule } from './reference/reference.module';
 import { DerivedRolesModule } from './derived-roles/derived-roles.module';
 import { DocumentGenerationModule } from './document-generation/document-generation.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { HealthController } from './common/health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { appConfig, dbConfig, jwtConfig, storageConfig } from './config/app.config';
 import { ProgramConfigValidationService } from './program-config-validation.service';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
