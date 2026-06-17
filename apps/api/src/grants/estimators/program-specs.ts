@@ -206,11 +206,20 @@ const FIBC: ProgramEstimateSpec = {
   ],
 };
 
+const AMPG: ProgramEstimateSpec = {
+  programCode: 'AMPG',
+  province: 'AB',
+  baseType: 'total',
+  baseFilter: { provinceMatch: 'AB' },
+  baseRate: 0.25,
+};
+
 // ── Registry ──
 
 const ALL_SPECS: ProgramEstimateSpec[] = [
   CPTC,
   FTTC,
+  AMPG,
   OPSTC,
   OCASE,
   BC_PSTC,

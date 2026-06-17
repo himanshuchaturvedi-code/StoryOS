@@ -156,7 +156,7 @@ function getProvinceProgramCodes(
     case 'BC':
       return ['BC-PSTC'];
     case 'AB':
-      return ['FTTC'];
+      return ['FTTC', 'AMPG'];
     case 'MB':
       return ['MB-FTTC'];
     default: {
