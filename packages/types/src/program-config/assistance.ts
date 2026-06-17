@@ -34,6 +34,8 @@ export interface AssistanceLine {
   originScope: AssistanceOriginScope;
   /** 2-letter province code identifying the origin jurisdiction of this funding. */
   originProvince?: string;
+  /** FinanceSourceStatus — only COMMITTED/RECEIVED reduce incentive bases. */
+  status: string;
 }
 
 export interface AssistanceContext {
@@ -41,7 +43,7 @@ export interface AssistanceContext {
   totalCost: number;
   /** Classified funding sources for the project. */
   lines: AssistanceLine[];
-  /** Sum of all lines where isAssistance=true. */
+  /** Sum of assistance lines with status COMMITTED or RECEIVED. */
   totalAssistance: number;
   /** Sum of assistance lines attributed directly to labour. */
   labourAssistance: number;

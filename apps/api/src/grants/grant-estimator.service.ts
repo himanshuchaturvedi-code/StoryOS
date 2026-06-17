@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@storyos/database';
-import { BudgetVersionStatus, ControlType } from '@storyos/types';
+import { BudgetVersionStatus, ControlType, FinanceSourceStatus } from '@storyos/types';
 import type { AssistanceContext, AssistanceLine, EligibilityContext } from '@storyos/types';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -186,6 +186,14 @@ function classifyAssistance(sourceType: string): boolean {
     default:
       return false;
   }
+}
+
+/** Only committed/received financing reduces incentive cost bases. */
+function countsTowardAssistanceDeduction(status: string): boolean {
+  return (
+    status === FinanceSourceStatus.COMMITTED ||
+    status === FinanceSourceStatus.RECEIVED
+  );
 }
 
 // ──────────────────────────────────────────
@@ -449,6 +457,7 @@ export class GrantEstimatorService extends TenantAwareService {
         attributionMissing,
         originScope,
         originProvince: s.originProvince ?? undefined,
+        status: s.status,
       };
     });
 
@@ -465,6 +474,7 @@ export class GrantEstimatorService extends TenantAwareService {
 
     for (const line of assistanceLines) {
       if (!line.isAssistance) continue;
+      if (!countsTowardAssistanceDeduction(line.status)) continue;
       totalAssistance += line.amount;
       if (line.attributionMissing) missingAttributionCount++;
 
