@@ -31,6 +31,19 @@ export type {
   FailedCondition,
 } from './eligibility-context';
 
+export type {
+  DocumentCondition,
+  DocumentRequirement,
+  FilingStage,
+  FilingStageCode,
+  ProgramDocumentSpec,
+} from './document-spec';
+export {
+  DOCUMENT_REQUIREMENT_LEVELS,
+  DocumentRequirementLevel,
+  FILING_STAGE_CODES,
+} from './document-spec';
+
 export {
   EXPECTED_PROGRAM_REQUIREMENTS,
   getExpectedRequirementCodes,
