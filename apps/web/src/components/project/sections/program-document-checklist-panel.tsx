@@ -2,9 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
-
-/** Programs with registry-backed document checklists (Phase 1). */
-const CHECKLIST_PROGRAM_CODES = ['AMPG', 'CPTC'] as const;
+import {
+  DOCUMENT_CHECKLIST_PROGRAM_CODES,
+  type ChecklistProgramRef,
+} from './extract-checklist-programs';
 
 type DocumentChecklistItemStatus =
   | 'FULFILLED'
@@ -45,11 +46,6 @@ interface DocumentChecklistResponse {
   fulfilledRequiredCount: number;
   missingRequiredCount: number;
   warnings: string[];
-}
-
-interface ChecklistProgramRef {
-  programCode: string;
-  programName: string;
 }
 
 interface ProgramDocumentChecklistPanelProps {
@@ -220,7 +216,7 @@ export function ProgramDocumentChecklistPanel({
   const applicablePrograms = useMemo(
     () =>
       programs.filter((program) =>
-        (CHECKLIST_PROGRAM_CODES as readonly string[]).includes(program.programCode),
+        (DOCUMENT_CHECKLIST_PROGRAM_CODES as readonly string[]).includes(program.programCode),
       ),
     [programs],
   );
@@ -346,4 +342,4 @@ export function ProgramDocumentChecklistPanel({
   );
 }
 
-export { CHECKLIST_PROGRAM_CODES };
+export { DOCUMENT_CHECKLIST_PROGRAM_CODES as CHECKLIST_PROGRAM_CODES };

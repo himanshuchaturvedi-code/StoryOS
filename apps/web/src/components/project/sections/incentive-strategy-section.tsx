@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { ProgramDocumentChecklistPanel } from './program-document-checklist-panel';
+import { extractChecklistProgramsFromStrategy } from './extract-checklist-programs';
 
 type IncentiveStrategySource = 'BUDGET' | 'ACTUAL';
 
@@ -700,12 +701,8 @@ export function IncentiveStrategySection({
   );
 
   const checklistPrograms = useMemo(
-    () =>
-      (data?.allPrograms ?? []).map((program) => ({
-        programCode: program.programCode,
-        programName: program.programName,
-      })),
-    [data?.allPrograms],
+    () => extractChecklistProgramsFromStrategy(data),
+    [data],
   );
 
   if (isLoading) {
