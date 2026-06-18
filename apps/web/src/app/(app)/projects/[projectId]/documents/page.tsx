@@ -1,10 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { apiClient, ApiError } from '@/lib/api-client';
 import { Button, Card, CardContent, CardHeader, Input } from '@storyos/ui';
 import { DocumentCategory } from '@storyos/types';
+import {
+  DocumentTagFields,
+  tagValueFromDocument,
+  toTagPayload,
+  type DocumentTagValue,
+} from '@/components/project/document-tag-fields';
+import { formatDocumentTagDisplay } from '@/lib/program-document-catalog';
 
 interface DocumentRecord {
   id: string;
@@ -15,9 +22,13 @@ interface DocumentRecord {
   storageKey: string;
   category: string;
   notes?: string | null;
+  programCode?: string | null;
+  programDocumentCode?: string | null;
   createdAt: string;
   uploadedBy: { firstName: string; lastName: string };
 }
+
+const EMPTY_TAG: DocumentTagValue = { programCode: '', programDocumentCode: '' };
 
 const CATEGORY_OPTIONS: { value: DocumentCategory; label: string }[] = [
   { value: DocumentCategory.SCRIPT, label: 'Script' },
@@ -46,14 +57,18 @@ export default function ProjectDocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Upload form state
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<DocumentCategory>(DocumentCategory.OTHER);
   const [notes, setNotes] = useState('');
+  const [uploadTag, setUploadTag] = useState<DocumentTagValue>(EMPTY_TAG);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editTag, setEditTag] = useState<DocumentTagValue>(EMPTY_TAG);
+  const [isSavingTag, setIsSavingTag] = useState(false);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -71,14 +86,27 @@ export default function ProjectDocumentsPage() {
     fetchDocuments();
   }, [fetchDocuments]);
 
+  function resetUploadForm() {
+    setTitle('');
+    setNotes('');
+    setUploadTag(EMPTY_TAG);
+    setSelectedFile(null);
+    setCategory(DocumentCategory.OTHER);
+  }
+
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedFile || !title) return;
+    if (uploadTag.programCode && !uploadTag.programDocumentCode) {
+      setError('Select a requirement when tagging to a program.');
+      return;
+    }
     setError(null);
     setIsUploading(true);
     setUploadProgress('Registering document…');
 
     try {
+      const tagPayload = toTagPayload(uploadTag);
       const { uploadUrl } = await apiClient.post<{ document: DocumentRecord; uploadUrl: string }>(
         '/documents/upload',
         {
@@ -89,11 +117,13 @@ export default function ProjectDocumentsPage() {
           category,
           notes: notes || undefined,
           projectId,
+          ...('programCode' in tagPayload && tagPayload.programCode
+            ? tagPayload
+            : {}),
         },
       );
 
       setUploadProgress('Uploading file…');
-      // Direct PUT to presigned URL — file bytes never pass through the API server
       const putResponse = await fetch(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
@@ -101,14 +131,11 @@ export default function ProjectDocumentsPage() {
       });
 
       if (!putResponse.ok) {
-        // In local dev the presigned URL is a stub, so we skip this check gracefully
         console.warn('PUT to presigned URL failed (expected in local dev):', putResponse.status);
       }
 
       setUploadProgress(null);
-      setTitle('');
-      setNotes('');
-      setSelectedFile(null);
+      resetUploadForm();
       setShowForm(false);
       await fetchDocuments();
     } catch (e) {
@@ -122,6 +149,7 @@ export default function ProjectDocumentsPage() {
   async function handleDelete(id: string) {
     try {
       await apiClient.delete(`/documents/${id}`);
+      if (editingDocId === id) setEditingDocId(null);
       await fetchDocuments();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to delete document');
@@ -142,16 +170,70 @@ export default function ProjectDocumentsPage() {
     }
   }
 
+  function startEditTag(doc: DocumentRecord) {
+    setEditingDocId(doc.id);
+    setEditTag(tagValueFromDocument(doc));
+    setError(null);
+  }
+
+  function cancelEditTag() {
+    setEditingDocId(null);
+    setEditTag(EMPTY_TAG);
+  }
+
+  async function handleSaveTag(docId: string) {
+    if (editTag.programCode && !editTag.programDocumentCode) {
+      setError('Select a requirement when a program is chosen.');
+      return;
+    }
+
+    setError(null);
+    setIsSavingTag(true);
+    try {
+      await apiClient.patch<DocumentRecord>(`/documents/${docId}`, toTagPayload(editTag));
+      setEditingDocId(null);
+      setEditTag(EMPTY_TAG);
+      await fetchDocuments();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to update document tag');
+    } finally {
+      setIsSavingTag(false);
+    }
+  }
+
+  async function handleClearTag(docId: string) {
+    setError(null);
+    setIsSavingTag(true);
+    try {
+      await apiClient.patch<DocumentRecord>(`/documents/${docId}`, {
+        programCode: null,
+        programDocumentCode: null,
+      });
+      setEditingDocId(null);
+      setEditTag(EMPTY_TAG);
+      await fetchDocuments();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to clear document tag');
+    } finally {
+      setIsSavingTag(false);
+    }
+  }
+
   if (isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-medium text-gray-900">Documents ({documents.length})</h2>
-        <Button onClick={() => setShowForm((v) => !v)}>
+        <Button onClick={() => setShowForm((value) => !value)}>
           {showForm ? 'Cancel' : 'Upload document'}
         </Button>
       </div>
+
+      <p className="text-sm text-gray-600">
+        Tag uploads to a program filing requirement (AMPG or CPTC) so the Application Documents
+        checklist can match them precisely.
+      </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -182,6 +264,12 @@ export default function ProjectDocumentsPage() {
                   ))}
                 </select>
               </div>
+              <DocumentTagFields
+                value={uploadTag}
+                onChange={setUploadTag}
+                disabled={isUploading}
+                idPrefix="upload"
+              />
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">File</label>
                 <input
@@ -213,6 +301,7 @@ export default function ProjectDocumentsPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Title</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Tagged to</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Category</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Size</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Uploaded by</th>
@@ -221,36 +310,92 @@ export default function ProjectDocumentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {documents.map((doc) => (
-                <tr key={doc.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{doc.title}</div>
-                    <div className="text-xs text-gray-500">{doc.fileName}</div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{doc.category}</td>
-                  <td className="px-4 py-3 text-gray-600">{formatBytes(doc.fileSize)}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {doc.uploadedBy.firstName} {doc.uploadedBy.lastName}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {new Date(doc.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownload(doc.id, doc.fileName)}
-                      >
-                        Download
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(doc.id)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {documents.map((doc) => {
+                const tagDisplay = formatDocumentTagDisplay(
+                  doc.programCode,
+                  doc.programDocumentCode,
+                );
+                const isEditing = editingDocId === doc.id;
+
+                return (
+                  <React.Fragment key={doc.id}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{doc.title}</div>
+                        <div className="text-xs text-gray-500">{doc.fileName}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {tagDisplay ?? <span className="text-gray-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{doc.category}</td>
+                      <td className="px-4 py-3 text-gray-600">{formatBytes(doc.fileSize)}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {doc.uploadedBy.firstName} {doc.uploadedBy.lastName}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => (isEditing ? cancelEditTag() : startEditTag(doc))}
+                          >
+                            {isEditing ? 'Cancel' : 'Edit tag'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownload(doc.id, doc.fileName)}
+                          >
+                            Download
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(doc.id)}>
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isEditing && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={7} className="px-4 py-4">
+                          <div className="max-w-2xl space-y-3">
+                            <p className="text-sm font-medium text-gray-900">
+                              Program filing tag for {doc.title}
+                            </p>
+                            <DocumentTagFields
+                              value={editTag}
+                              onChange={setEditTag}
+                              disabled={isSavingTag}
+                              idPrefix={`edit-${doc.id}`}
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                disabled={isSavingTag}
+                                onClick={() => handleSaveTag(doc.id)}
+                              >
+                                {isSavingTag ? 'Saving…' : 'Save tag'}
+                              </Button>
+                              {tagDisplay && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isSavingTag}
+                                  onClick={() => handleClearTag(doc.id)}
+                                >
+                                  Clear tag
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
