@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
+import { ProgramDocumentChecklistPanel } from './program-document-checklist-panel';
 
 type IncentiveStrategySource = 'BUDGET' | 'ACTUAL';
 
@@ -698,6 +699,15 @@ export function IncentiveStrategySection({
     [data],
   );
 
+  const checklistPrograms = useMemo(
+    () =>
+      (data?.allPrograms ?? []).map((program) => ({
+        programCode: program.programCode,
+        programName: program.programName,
+      })),
+    [data?.allPrograms],
+  );
+
   if (isLoading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-6">
@@ -729,6 +739,11 @@ export function IncentiveStrategySection({
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
         {data.caveat}
       </div>
+
+      <ProgramDocumentChecklistPanel
+        projectId={projectId}
+        programs={checklistPrograms}
+      />
 
       {data.scenarios.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-6">
