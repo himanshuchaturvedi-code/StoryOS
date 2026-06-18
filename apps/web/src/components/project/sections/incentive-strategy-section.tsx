@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { ProgramDocumentChecklistPanel } from './program-document-checklist-panel';
-import { extractChecklistProgramsFromStrategy } from './extract-checklist-programs';
+import { extractChecklistProgramsFromVisibleStrategyBadges } from './extract-checklist-programs';
 
 type IncentiveStrategySource = 'BUDGET' | 'ACTUAL';
 
@@ -701,9 +701,28 @@ export function IncentiveStrategySection({
   );
 
   const checklistPrograms = useMemo(
-    () => extractChecklistProgramsFromStrategy(data),
-    [data],
+    () =>
+      extractChecklistProgramsFromVisibleStrategyBadges({
+        recommendedPrograms: recommendedScenario?.programs,
+        otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs),
+        allPrograms: data?.allPrograms,
+        combinationTitles: [
+          ...(recommendedScenario ? [recommendedScenario.title] : []),
+          ...otherScenarios.map((scenario) => scenario.title),
+        ],
+      }),
+    [recommendedScenario, otherScenarios, data?.allPrograms],
   );
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || !data) return;
+    console.info('[IncentiveStrategySection] Application Documents debug', {
+      checklistPrograms,
+      recommendedScenarioPrograms: recommendedScenario?.programs,
+      otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs),
+      allPrograms: data.allPrograms,
+    });
+  }, [data, checklistPrograms, recommendedScenario, otherScenarios]);
 
   if (isLoading) {
     return (
@@ -736,6 +755,26 @@ export function IncentiveStrategySection({
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
         {data.caveat}
       </div>
+
+      {process.env.NODE_ENV === 'development' && (
+        <details className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-700">
+          <summary className="cursor-pointer font-medium">
+            Application Documents debug (dev only)
+          </summary>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">
+            {JSON.stringify(
+              {
+                checklistPrograms,
+                recommendedScenarioPrograms: recommendedScenario?.programs ?? null,
+                otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs),
+                allPrograms: data.allPrograms,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </details>
+      )}
 
       <ProgramDocumentChecklistPanel
         projectId={projectId}

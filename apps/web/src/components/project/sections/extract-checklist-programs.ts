@@ -16,39 +16,81 @@ interface StrategyProgramLike {
 
 export interface IncentiveStrategyChecklistSource {
   allPrograms?: StrategyProgramLike[];
-  scenarios?: Array<{ programs?: StrategyProgramLike[]; isRecommended?: boolean }>;
+  scenarios?: Array<{
+    programs?: StrategyProgramLike[];
+    isRecommended?: boolean;
+    title?: string;
+  }>;
   recommendedScenarioId?: string | null;
 }
 
+/** Same program-code arrays rendered as gray badges on strategy scenario cards. */
+export interface VisibleStrategyBadgeSource {
+  recommendedPrograms?: StrategyProgramLike[];
+  otherScenarioPrograms?: StrategyProgramLike[][];
+  allPrograms?: StrategyProgramLike[];
+  /** Card headings for combination stacks (e.g. "AMPG + PSTC"). */
+  combinationTitles?: string[];
+}
+
+export function normalizeChecklistProgramCode(
+  code: string | undefined,
+): DocumentChecklistProgramCode | null {
+  if (!code) return null;
+  const normalized = code.trim().toUpperCase();
+  if (
+    !(DOCUMENT_CHECKLIST_PROGRAM_CODES as readonly string[]).includes(normalized)
+  ) {
+    return null;
+  }
+  return normalized as DocumentChecklistProgramCode;
+}
+
+function absorbPrograms(
+  byCode: Map<DocumentChecklistProgramCode, string>,
+  programs: StrategyProgramLike[] | undefined,
+) {
+  for (const program of programs ?? []) {
+    const code = normalizeChecklistProgramCode(program.programCode);
+    if (!code) continue;
+    if (!byCode.has(code)) {
+      byCode.set(code, program.programName?.trim() || code);
+    }
+  }
+}
+
+/** Combination scenario titles are built from program codes joined with " + ". */
+function absorbCombinationTitle(
+  byCode: Map<DocumentChecklistProgramCode, string>,
+  title: string | undefined,
+) {
+  if (!title?.includes(' + ')) return;
+  for (const segment of title.split(' + ')) {
+    const code = normalizeChecklistProgramCode(segment);
+    if (code && !byCode.has(code)) {
+      byCode.set(code, code);
+    }
+  }
+}
+
 /**
- * Collect AMPG/CPTC from anywhere in the incentive strategy response.
- * Scenarios (recommended stack included) are scanned in addition to allPrograms.
+ * Collect AMPG/CPTC from the same sources as strategy card badges:
+ * recommended + other scenario program lists, allPrograms, and combination titles.
  */
-export function extractChecklistProgramsFromStrategy(
-  data: IncentiveStrategyChecklistSource | null | undefined,
+export function extractChecklistProgramsFromVisibleStrategyBadges(
+  source: VisibleStrategyBadgeSource | null | undefined,
 ): ChecklistProgramRef[] {
-  if (!data) return [];
+  if (!source) return [];
 
   const byCode = new Map<DocumentChecklistProgramCode, string>();
 
-  function absorb(programs: StrategyProgramLike[] | undefined) {
-    for (const program of programs ?? []) {
-      const code = program.programCode;
-      if (!code) continue;
-      if (!(DOCUMENT_CHECKLIST_PROGRAM_CODES as readonly string[]).includes(code)) {
-        continue;
-      }
-      const checklistCode = code as DocumentChecklistProgramCode;
-      if (!byCode.has(checklistCode)) {
-        byCode.set(checklistCode, program.programName?.trim() || code);
-      }
-    }
+  absorbPrograms(byCode, source.recommendedPrograms);
+  for (const programs of source.otherScenarioPrograms ?? []) {
+    absorbPrograms(byCode, programs);
   }
-
-  absorb(data.allPrograms);
-
-  for (const scenario of data.scenarios ?? []) {
-    absorb(scenario.programs);
+  absorbPrograms(byCode, source.allPrograms);
+  for (const title of source.combinationTitles ?? []) {
+    absorbCombinationTitle(byCode, title);
   }
 
   return DOCUMENT_CHECKLIST_PROGRAM_CODES.filter((code) => byCode.has(code)).map(
@@ -57,4 +99,29 @@ export function extractChecklistProgramsFromStrategy(
       programName: byCode.get(code)!,
     }),
   );
+}
+
+/**
+ * Collect AMPG/CPTC from a full incentive strategy response using the same
+ * visible scenario slices as IncentiveStrategySection (recommended + other cards).
+ */
+export function extractChecklistProgramsFromStrategy(
+  data: IncentiveStrategyChecklistSource | null | undefined,
+): ChecklistProgramRef[] {
+  if (!data) return [];
+
+  const recommendedScenario =
+    data.scenarios?.find((scenario) => scenario.isRecommended) ?? null;
+  const otherScenarios =
+    data.scenarios?.filter((scenario) => !scenario.isRecommended) ?? [];
+
+  return extractChecklistProgramsFromVisibleStrategyBadges({
+    recommendedPrograms: recommendedScenario?.programs,
+    otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs ?? []),
+    allPrograms: data.allPrograms,
+    combinationTitles: [
+      ...(recommendedScenario?.title ? [recommendedScenario.title] : []),
+      ...otherScenarios.map((scenario) => scenario.title ?? ''),
+    ],
+  });
 }

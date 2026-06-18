@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import {
   DOCUMENT_CHECKLIST_PROGRAM_CODES,
+  normalizeChecklistProgramCode,
   type ChecklistProgramRef,
 } from './extract-checklist-programs';
 
@@ -215,9 +216,16 @@ export function ProgramDocumentChecklistPanel({
 
   const applicablePrograms = useMemo(
     () =>
-      programs.filter((program) =>
-        (DOCUMENT_CHECKLIST_PROGRAM_CODES as readonly string[]).includes(program.programCode),
-      ),
+      programs.flatMap((program) => {
+        const code = normalizeChecklistProgramCode(program.programCode);
+        if (!code) return [];
+        return [
+          {
+            programCode: code,
+            programName: program.programName?.trim() || code,
+          },
+        ];
+      }),
     [programs],
   );
 
