@@ -10,7 +10,7 @@ import {
 // Third code registry alongside PROGRAM_SPECS and PROGRAM_CONFIGS.
 // Declares required/optional documents and filing stages per program.
 //
-// Consumed by DocumentChecklistService in Phase 2 — not wired yet.
+// Consumed by DocumentChecklistService (Phase 2+).
 
 const STANDARD_FILING_STAGES: ProgramDocumentSpec['filingStages'] = [
   {
