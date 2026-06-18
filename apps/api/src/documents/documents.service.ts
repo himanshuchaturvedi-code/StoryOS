@@ -4,6 +4,11 @@ import { TenantContext } from '../tenant/tenant.context';
 import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { StorageService } from './storage.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
+import {
+  assertValidProgramDocumentTag,
+  resolveProgramDocumentTag,
+} from './program-document-tag.validation';
 
 @Injectable()
 export class DocumentsService extends TenantAwareService {
@@ -34,6 +39,11 @@ export class DocumentsService extends TenantAwareService {
       fileName: dto.fileName,
     });
 
+    const tags = assertValidProgramDocumentTag(
+      dto.programCode,
+      dto.programDocumentCode,
+    );
+
     const document = await this.prisma.document.create({
       data: {
         id: docId,
@@ -47,6 +57,8 @@ export class DocumentsService extends TenantAwareService {
         storageKey,
         category: dto.category ?? 'OTHER',
         notes: dto.notes ?? null,
+        programCode: tags.programCode,
+        programDocumentCode: tags.programDocumentCode,
       },
     });
 
@@ -80,6 +92,35 @@ export class DocumentsService extends TenantAwareService {
 
     const downloadUrl = await this.storage.getDownloadUrl(document.storageKey);
     return { ...document, downloadUrl };
+  }
+
+  async update(id: string, dto: UpdateDocumentDto) {
+    const existing = await this.prisma.document.findFirst({
+      where: this.tenantFilter({ id }),
+    });
+    if (!existing) throw new NotFoundException('Document not found');
+
+    const tags = resolveProgramDocumentTag(
+      {
+        programCode: existing.programCode,
+        programDocumentCode: existing.programDocumentCode,
+      },
+      dto,
+    );
+
+    return this.prisma.document.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        programCode: tags.programCode,
+        programDocumentCode: tags.programDocumentCode,
+      },
+      include: {
+        uploadedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
   }
 
   async remove(id: string) {

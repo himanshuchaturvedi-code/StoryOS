@@ -36,6 +36,7 @@ export class DocumentChecklistService extends TenantAwareService {
     const context = await this.buildApplicabilityContext(projectId, projectDocuments);
 
     const items = matchDocumentRequirements({
+      programCode,
       requirements: spec.documents,
       projectDocuments,
       context,
@@ -83,6 +84,8 @@ export class DocumentChecklistService extends TenantAwareService {
         id: true,
         category: true,
         notes: true,
+        programCode: true,
+        programDocumentCode: true,
       },
       orderBy: { createdAt: 'desc' },
     });

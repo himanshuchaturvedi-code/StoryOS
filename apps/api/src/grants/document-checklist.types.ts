@@ -10,7 +10,11 @@ export type DocumentChecklistItemStatus =
   | 'AMBIGUOUS'
   | 'NOT_APPLICABLE';
 
-export type DocumentFulfillmentSource = 'DOCUMENT_CODE' | 'CATEGORY' | 'NONE';
+export type DocumentFulfillmentSource =
+  | 'EXPLICIT_TAG'
+  | 'DOCUMENT_CODE'
+  | 'CATEGORY'
+  | 'NONE';
 
 export interface DocumentChecklistItem {
   documentCode: string;

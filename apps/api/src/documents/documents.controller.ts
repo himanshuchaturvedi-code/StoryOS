@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -16,6 +17,7 @@ import { RequirePermission } from '../common/decorators/require-permission.decor
 import { PERMISSIONS } from '@storyos/types';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @UseGuards(TenantGuard, PermissionGuard)
 @Controller('documents')
@@ -43,6 +45,12 @@ export class DocumentsController {
   @RequirePermission(PERMISSIONS.DOCUMENT_READ)
   findOne(@Param('id') id: string) {
     return this.documentsService.findById(id);
+  }
+
+  @Patch(':id')
+  @RequirePermission(PERMISSIONS.DOCUMENT_UPLOAD)
+  update(@Param('id') id: string, @Body() dto: UpdateDocumentDto) {
+    return this.documentsService.update(id, dto);
   }
 
   @Delete(':id')

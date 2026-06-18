@@ -17,6 +17,8 @@ export interface ProjectDocumentRecord {
   id: string;
   category: string;
   notes: string | null;
+  programCode: string | null;
+  programDocumentCode: string | null;
 }
 
 export interface RequirementApplicabilityContext {
@@ -108,15 +110,17 @@ function buildItem(
  * Match program document requirements against project uploads.
  *
  * Priority:
+ * 0. Explicit Document.programCode + Document.programDocumentCode tags
  * 1. documentCode tag in Document.notes (`documentCode=PRODUCTION_BUDGET`)
  * 2. DocumentCategory fallback (ambiguous when shared across requirements)
  */
 export function matchDocumentRequirements(args: {
+  programCode: string;
   requirements: DocumentRequirement[];
   projectDocuments: ProjectDocumentRecord[];
   context: RequirementApplicabilityContext;
 }): DocumentChecklistItem[] {
-  const { requirements, projectDocuments, context } = args;
+  const { programCode, requirements, projectDocuments, context } = args;
   const usedDocumentIds = new Set<string>();
   const items = new Map<string, DocumentChecklistItem>();
 
@@ -137,6 +141,34 @@ export function matchDocumentRequirements(args: {
   });
 
   for (const requirement of applicableRequirements) {
+    const explicitMatches = projectDocuments.filter(
+      (doc) =>
+        !usedDocumentIds.has(doc.id) &&
+        doc.programCode === programCode &&
+        doc.programDocumentCode === requirement.documentCode,
+    );
+
+    if (explicitMatches.length > 0) {
+      for (const doc of explicitMatches) {
+        usedDocumentIds.add(doc.id);
+      }
+      items.set(
+        requirement.documentCode,
+        buildItem(
+          requirement,
+          'FULFILLED',
+          'EXPLICIT_TAG',
+          explicitMatches.map((doc) => doc.id),
+        ),
+      );
+    }
+  }
+
+  for (const requirement of applicableRequirements) {
+    if (items.has(requirement.documentCode)) {
+      continue;
+    }
+
     const codeMatches = projectDocuments.filter(
       (doc) =>
         !usedDocumentIds.has(doc.id) &&

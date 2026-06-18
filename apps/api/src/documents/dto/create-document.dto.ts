@@ -39,6 +39,16 @@ export class CreateDocumentDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
+  programCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  programDocumentCode?: string;
+
+  @IsOptional()
+  @IsString()
   @IsUUID()
   projectId?: string;
 }
