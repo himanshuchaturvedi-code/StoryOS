@@ -123,15 +123,18 @@ export default function ProjectDocumentsPage() {
         },
       );
 
-      setUploadProgress('Uploading file…');
-      const putResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
-        body: selectedFile,
-      });
+      const isStubUpload = uploadUrl.includes('presigned-stub=true');
+      if (!isStubUpload) {
+        setUploadProgress('Uploading file…');
+        const putResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+          body: selectedFile,
+        });
 
-      if (!putResponse.ok) {
-        console.warn('PUT to presigned URL failed (expected in local dev):', putResponse.status);
+        if (!putResponse.ok) {
+          console.warn('PUT to presigned URL failed:', putResponse.status);
+        }
       }
 
       setUploadProgress(null);
