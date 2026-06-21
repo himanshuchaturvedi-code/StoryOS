@@ -34,6 +34,66 @@ export class ProgramApplicationsService extends TenantAwareService {
     return { organizationId: this.organizationId, ...extra };
   }
 
+  async findAllByProject(projectId: string) {
+    return this.prisma.programApplication.findMany({
+      where: this.applicationFilter({
+        projectProgram: { projectId },
+      }),
+      include: applicationInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findById(projectId: string, applicationId: string) {
+    const application = await this.prisma.programApplication.findFirst({
+      where: this.applicationFilter({
+        id: applicationId,
+        projectProgram: { projectId },
+      }),
+      include: applicationInclude,
+    });
+
+    if (!application) {
+      throw new NotFoundException('Program application not found');
+    }
+
+    return application;
+  }
+
+  async initiateApplication(projectId: string, programVersionId: string) {
+    let projectProgram = await this.prisma.projectProgram.findFirst({
+      where: this.tenantFilter({ projectId, programVersionId }),
+    });
+
+    if (!projectProgram) {
+      projectProgram = await this.prisma.projectProgram.create({
+        data: this.tenantData({
+          projectId,
+          programVersionId,
+          createdById: this.tenant.userId,
+        }),
+      });
+    }
+
+    const existingApplication = await this.prisma.programApplication.findFirst({
+      where: this.applicationFilter({ projectProgramId: projectProgram.id }),
+      include: applicationInclude,
+    });
+
+    if (existingApplication) {
+      return existingApplication;
+    }
+
+    return this.prisma.programApplication.create({
+      data: this.tenantData({
+        projectProgramId: projectProgram.id,
+        status: ProgramApplicationStatus.PREPARING,
+        createdById: this.tenant.userId,
+      }),
+      include: applicationInclude,
+    });
+  }
+
   async findByProjectProgram(projectId: string, projectProgramId: string) {
     await this.assertProjectProgramExists(projectId, projectProgramId);
 

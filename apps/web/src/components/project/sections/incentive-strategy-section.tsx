@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
-import { ProgramDocumentChecklistPanel } from './program-document-checklist-panel';
-import { extractChecklistProgramsFromVisibleStrategyBadges } from './extract-checklist-programs';
 
 type IncentiveStrategySource = 'BUDGET' | 'ACTUAL';
 
@@ -528,13 +527,31 @@ function ControlTraceBlock({ label, trace }: { label: string; trace: Record<stri
 }
 
 function StrategyScenarioCard({
+  projectId,
   scenario,
   isRecommended,
 }: {
+  projectId: string;
   scenario: StrategyScenario;
   isRecommended: boolean;
 }) {
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isInitiating, setIsInitiating] = useState<string | null>(null);
+
+  const handleInitiate = async (programVersionId: string) => {
+    setIsInitiating(programVersionId);
+    try {
+      const response = await apiClient.post<{ id: string }>(
+        `/projects/${projectId}/applications/initiate`,
+        { programVersionId }
+      );
+      router.push(`/projects/${projectId}/applications/${response.id}`);
+    } catch (e) {
+      console.error(e);
+      setIsInitiating(null);
+    }
+  };
 
   const hasTraces = scenario.programs.some((p) => p.breakdown?.trace);
   const failedRequirements = scenario.programs.flatMap((program) =>
@@ -608,12 +625,19 @@ function StrategyScenarioCard({
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap gap-2">
             {scenario.programs.map((program) => (
-              <span
-                key={program.programVersionId}
-                className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
-              >
-                {program.programCode}
-              </span>
+              <div key={program.programVersionId} className="flex items-center gap-1 rounded-md bg-gray-100 pl-2 pr-1 py-1">
+                <span className="text-xs font-medium text-gray-700">
+                  {program.programCode}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleInitiate(program.programVersionId)}
+                  disabled={isInitiating === program.programVersionId}
+                  className="ml-2 inline-flex items-center rounded bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {isInitiating === program.programVersionId ? 'Initiating...' : 'Initiate Application'}
+                </button>
+              </div>
             ))}
           </div>
           {scenario.sensitivity && scenario.sensitivity.length > 0 && (
@@ -700,30 +724,6 @@ export function IncentiveStrategySection({
     [data],
   );
 
-  const checklistPrograms = useMemo(
-    () =>
-      extractChecklistProgramsFromVisibleStrategyBadges({
-        recommendedPrograms: recommendedScenario?.programs,
-        otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs),
-        allPrograms: data?.allPrograms,
-        combinationTitles: [
-          ...(recommendedScenario ? [recommendedScenario.title] : []),
-          ...otherScenarios.map((scenario) => scenario.title),
-        ],
-      }),
-    [recommendedScenario, otherScenarios, data?.allPrograms],
-  );
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'development' || !data) return;
-    console.info('[IncentiveStrategySection] Application Documents debug', {
-      checklistPrograms,
-      recommendedScenarioPrograms: recommendedScenario?.programs,
-      otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs),
-      allPrograms: data.allPrograms,
-    });
-  }, [data, checklistPrograms, recommendedScenario, otherScenarios]);
-
   if (isLoading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-6">
@@ -756,31 +756,6 @@ export function IncentiveStrategySection({
         {data.caveat}
       </div>
 
-      {process.env.NODE_ENV === 'development' && (
-        <details className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-700">
-          <summary className="cursor-pointer font-medium">
-            Application Documents debug (dev only)
-          </summary>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">
-            {JSON.stringify(
-              {
-                checklistPrograms,
-                recommendedScenarioPrograms: recommendedScenario?.programs ?? null,
-                otherScenarioPrograms: otherScenarios.map((scenario) => scenario.programs),
-                allPrograms: data.allPrograms,
-              },
-              null,
-              2,
-            )}
-          </pre>
-        </details>
-      )}
-
-      <ProgramDocumentChecklistPanel
-        projectId={projectId}
-        programs={checklistPrograms}
-      />
-
       {data.scenarios.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <p className="text-sm text-gray-500">
@@ -795,6 +770,7 @@ export function IncentiveStrategySection({
                 Recommended Strategy
               </h3>
               <StrategyScenarioCard
+                projectId={projectId}
                 scenario={recommendedScenario}
                 isRecommended={true}
               />
@@ -810,6 +786,7 @@ export function IncentiveStrategySection({
                 {otherScenarios.map((scenario) => (
                   <StrategyScenarioCard
                     key={scenario.id}
+                    projectId={projectId}
                     scenario={scenario}
                     isRecommended={false}
                   />
