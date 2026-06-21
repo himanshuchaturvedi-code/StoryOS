@@ -20,6 +20,12 @@ interface ApplicationSummary {
   };
 }
 
+interface ChecklistSummary {
+  requiredCount: number;
+  fulfilledRequiredCount: number;
+  missingRequiredCount: number;
+}
+
 export default function FundingApplicationsPage({
   params,
 }: {
@@ -27,6 +33,7 @@ export default function FundingApplicationsPage({
 }) {
   const { projectId } = React.use(params);
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
+  const [checklists, setChecklists] = useState<Record<string, ChecklistSummary | null>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,8 +42,28 @@ export default function FundingApplicationsPage({
     async function load() {
       setIsLoading(true);
       try {
-        const data = await apiClient.get<ApplicationSummary[]>(`/projects/${projectId}/applications`);
-        if (isMounted) setApplications(data);
+        const apps = await apiClient.get<ApplicationSummary[]>(`/projects/${projectId}/applications`);
+        if (!isMounted) return;
+        setApplications(apps || []);
+
+        if (apps && apps.length > 0) {
+          const checklistEntries = await Promise.all(
+            apps.map(async (app) => {
+              const code = app.projectProgram.programVersion.program.code;
+              try {
+                const checklist = await apiClient.get<ChecklistSummary>(
+                  `/projects/${projectId}/programs/by-code/${code}/document-checklist`,
+                );
+                return [app.id, checklist] as const;
+              } catch {
+                return [app.id, null] as const;
+              }
+            }),
+          );
+          if (isMounted) {
+            setChecklists(Object.fromEntries(checklistEntries));
+          }
+        }
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : 'Failed to load applications');
@@ -97,38 +124,82 @@ export default function FundingApplicationsPage({
               <tr>
                 <th className="px-4 py-3 font-medium text-gray-500">Program</th>
                 <th className="px-4 py-3 font-medium text-gray-500">Status</th>
-                <th className="px-4 py-3 font-medium text-gray-500">Target Date</th>
-                <th className="px-4 py-3 font-medium text-gray-500">Ref #</th>
+                <th className="px-4 py-3 font-medium text-gray-500">Progress</th>
+                <th className="px-4 py-3 font-medium text-gray-500">Next Deadline</th>
+                <th className="px-4 py-3 font-medium text-gray-500">Agency Ref #</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-500">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {applications.map((app) => (
-                <tr key={app.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">
-                    {app.projectProgram.programVersion.program.name} ({app.projectProgram.programVersion.program.code})
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-500">
-                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                      {app.status}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-500">
-                    {app.targetFilingDate ? new Date(app.targetFilingDate).toLocaleDateString() : '-'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-500">
-                    {app.externalRef || '-'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium">
-                    <Link
-                      href={`/projects/${projectId}/applications/${app.id}`}
-                      className="text-brand-600 hover:text-brand-900"
-                    >
-                      View Details
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {applications.map((app) => {
+                const checklist = checklists[app.id];
+                const progressPercent = checklist && checklist.requiredCount > 0
+                  ? Math.round((checklist.fulfilledRequiredCount / checklist.requiredCount) * 100)
+                  : 0;
+
+                return (
+                  <tr key={app.id} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-4 py-4">
+                      <div className="font-medium text-gray-900">
+                        {app.projectProgram.programVersion.program.name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {app.projectProgram.programVersion.program.code}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                        ${app.status === 'PREPARING' ? 'bg-amber-100 text-amber-800' : 
+                          app.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                          'bg-blue-100 text-blue-800'}`}>
+                        {app.status}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4">
+                      {checklist ? (
+                        <div className="flex flex-col gap-1 w-32">
+                          <div className="flex justify-between text-xs text-gray-600">
+                            <span>{checklist.fulfilledRequiredCount} / {checklist.requiredCount}</span>
+                            {checklist.missingRequiredCount > 0 && (
+                              <span className="font-medium text-red-600">{checklist.missingRequiredCount} missing</span>
+                            )}
+                          </div>
+                          {checklist.requiredCount > 0 && (
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                              <div
+                                className={`h-full rounded-full transition-all ${checklist.missingRequiredCount === 0 ? 'bg-green-500' : 'bg-brand-500'}`}
+                                style={{ width: `${progressPercent}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">No checklist</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-700">
+                      {app.targetFilingDate ? (
+                        <span className="font-medium">
+                          {new Date(app.targetFilingDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-700">
+                      {app.externalRef || <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
+                      <Link
+                        href={`/projects/${projectId}/applications/${app.id}`}
+                        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                      >
+                        Open Workspace
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

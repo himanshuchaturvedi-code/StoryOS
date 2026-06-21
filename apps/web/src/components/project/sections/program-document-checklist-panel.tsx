@@ -179,7 +179,13 @@ function ProgramChecklistCard({
               {stage.label}
             </h5>
             <ul className="mt-2 space-y-1.5">
-              {stage.documents.map((doc) => (
+              {[...stage.documents]
+                .sort((a, b) => {
+                  if (a.status === 'MISSING' && b.status !== 'MISSING') return -1;
+                  if (a.status !== 'MISSING' && b.status === 'MISSING') return 1;
+                  return 0;
+                })
+                .map((doc) => (
                 <li
                   key={doc.documentCode}
                   className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 bg-white px-3 py-2 text-sm"
