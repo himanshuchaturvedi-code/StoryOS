@@ -21,6 +21,7 @@ import { OwnershipsModule } from './ownerships/ownerships.module';
 import { ExpenseFactsModule } from './expense-facts/expense-facts.module';
 import { ProgramsModule } from './programs/programs.module';
 import { ProjectProgramsModule } from './project-programs/project-programs.module';
+import { ProgramApplicationsModule } from './program-applications/program-applications.module';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { CalculatorsModule } from './calculators/calculators.module';
 import { GrantsModule } from './grants/grants.module';
@@ -62,6 +63,7 @@ import { ProgramConfigValidationService } from './program-config-validation.serv
     ExpenseFactsModule,
     ProgramsModule,
     ProjectProgramsModule,
+    ProgramApplicationsModule,
     SubmissionsModule,
     CalculatorsModule,
     GrantsModule,

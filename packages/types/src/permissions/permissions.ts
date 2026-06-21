@@ -152,6 +152,11 @@ export const PERMISSIONS = {
   SUBMISSION_UPDATE: 'submission:update',
   SUBMISSION_DELETE: 'submission:delete',
 
+  // ── Program Applications (Phase 4+) ────
+  PROGRAM_APPLICATION_CREATE: 'program_application:create',
+  PROGRAM_APPLICATION_READ: 'program_application:read',
+  PROGRAM_APPLICATION_UPDATE: 'program_application:update',
+
   // ── Submission Evidence (Phase 4) ──────
   EVIDENCE_CREATE: 'evidence:create',
   EVIDENCE_READ: 'evidence:read',

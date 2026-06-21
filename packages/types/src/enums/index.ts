@@ -295,6 +295,15 @@ export enum SubmissionStatus {
   WITHDRAWN = 'WITHDRAWN',
 }
 
+export enum ProgramApplicationStatus {
+  PREPARING = 'PREPARING',
+  READY = 'READY',
+  FILED = 'FILED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
 export enum AssessmentResult {
   PASS = 'PASS',
   FAIL = 'FAIL',
