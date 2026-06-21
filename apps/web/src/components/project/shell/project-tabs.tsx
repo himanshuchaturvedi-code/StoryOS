@@ -8,7 +8,7 @@ interface ProjectTabsProps {
 }
 
 interface TabDef {
-  key: 'home' | 'plan' | 'actuals';
+  key: 'home' | 'plan' | 'incentives' | 'applications' | 'documents' | 'actuals';
   label: string;
   href: string;
   enabled: boolean;
@@ -25,15 +25,39 @@ const TABS: TabDef[] = [
   },
   {
     key: 'plan',
-    label: 'Plan',
+    label: 'Project Data',
     href: '/plan',
     enabled: true,
     match: (pathname, base) =>
       pathname === `${base}/plan` || pathname.startsWith(`${base}/plan/`),
   },
   {
+    key: 'incentives',
+    label: 'Strategy & Applications',
+    href: '/incentives',
+    enabled: true,
+    match: (pathname, base) =>
+      pathname === `${base}/incentives` || pathname.startsWith(`${base}/incentives/`),
+  },
+  {
+    key: 'applications',
+    label: 'Funding Applications',
+    href: '/applications',
+    enabled: true,
+    match: (pathname, base) =>
+      pathname === `${base}/applications` || pathname.startsWith(`${base}/applications/`),
+  },
+  {
+    key: 'documents',
+    label: 'Document Vault',
+    href: '/documents',
+    enabled: true,
+    match: (pathname, base) =>
+      pathname === `${base}/documents` || pathname.startsWith(`${base}/documents/`),
+  },
+  {
     key: 'actuals',
-    label: 'Actuals',
+    label: 'Compliance & Claims',
     href: '/actuals',
     enabled: true,
     match: (pathname, base) =>

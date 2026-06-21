@@ -59,11 +59,7 @@ export default function PlanOverviewPage() {
         { label: 'Milestones', href: `/projects/${projectId}/milestones` },
       ],
     },
-    {
-      title: 'Documents',
-      description: 'Project document library (chain of title, contracts, etc.).',
-      href: `/projects/${projectId}/documents`,
-    },
+
   ];
 
   return (
