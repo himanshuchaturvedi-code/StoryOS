@@ -7,6 +7,7 @@ import { BudgetAccountsService } from './budget-accounts.service';
 import { CreateBudgetLineDto } from './dto/create-budget-line.dto';
 import { UpdateBudgetLineDto } from './dto/update-budget-line.dto';
 import { AnnotateBudgetLineDto } from './dto/annotate-budget-line.dto';
+import { labourAmountsEqual, resolveWriteLabourAmount } from './labour-amount-sync';
 
 const ANNOTATION_FIELDS = [
   'personId', 'vendorId', 'locationId', 'productionPhaseId',
@@ -52,6 +53,21 @@ export class BudgetLinesService extends TenantAwareService {
     await this.accountsService.assertAccountExists(budgetId, dto.budgetAccountId);
     this.validatePartyExclusivity(dto.personId, dto.vendorId);
 
+    const account = await this.prisma.budgetAccount.findFirst({
+      where: this.tenantFilter({ id: dto.budgetAccountId, budgetId }),
+      select: { accountType: true },
+    });
+    if (!account) throw new NotFoundException('Budget account not found');
+
+    const syncedLabourAmount = resolveWriteLabourAmount({
+      operation: 'create',
+      expenseType: dto.expenseType ?? null,
+      accountType: account.accountType,
+      amount: dto.amount,
+      currentLabourAmount: dto.labourAmount ?? null,
+      requestedLabourAmount: dto.labourAmount ?? null,
+    });
+
     return this.prisma.budgetLine.create({
       data: this.tenantData({
         budgetVersionId: versionId,
@@ -67,7 +83,7 @@ export class BudgetLinesService extends TenantAwareService {
         vendorId: dto.vendorId ?? null,
         locationId: dto.locationId ?? null,
         productionPhaseId: dto.productionPhaseId ?? null,
-        labourAmount: dto.labourAmount ?? null,
+        labourAmount: syncedLabourAmount ?? null,
         expenseType: dto.expenseType ?? null,
         activityType: dto.activityType ?? null,
         isServiceContract: dto.isServiceContract ?? null,
@@ -89,11 +105,24 @@ export class BudgetLinesService extends TenantAwareService {
 
   async update(budgetId: string, versionId: string, lineId: string, dto: UpdateBudgetLineDto) {
     await this.versionsService.assertVersionDraft(budgetId, versionId);
-    await this.assertLineExists(versionId, lineId);
+    const existing = await this.loadLineWithAccount(versionId, lineId);
+
+    const updateData: Record<string, unknown> = { ...dto };
+    if (dto.amount !== undefined) {
+      const syncedLabourAmount = resolveWriteLabourAmount({
+        operation: 'amount_change',
+        expenseType: existing.expenseType,
+        accountType: existing.account.accountType,
+        amount: dto.amount,
+        currentLabourAmount:
+          existing.labourAmount != null ? Number(existing.labourAmount) : null,
+      });
+      updateData.labourAmount = syncedLabourAmount ?? null;
+    }
 
     return this.prisma.budgetLine.update({
       where: { id: lineId },
-      data: dto,
+      data: updateData,
       include: {
         account: {
           select: {
@@ -111,17 +140,33 @@ export class BudgetLinesService extends TenantAwareService {
 
   async annotate(budgetId: string, versionId: string, lineId: string, dto: AnnotateBudgetLineDto) {
     await this.assertVersionBelongsToBudget(budgetId, versionId);
-    const existing = await this.assertLineExists(versionId, lineId);
+    const existing = await this.loadLineWithAccount(versionId, lineId);
     this.validatePartyExclusivity(
       dto.personId !== undefined ? dto.personId : (existing as any).personId,
       dto.vendorId !== undefined ? dto.vendorId : (existing as any).vendorId,
     );
 
-    if (dto.labourAmount !== undefined && dto.labourAmount !== null) {
-      const lineAmount = Number((existing as any).amount);
-      if (dto.labourAmount > lineAmount) {
-        throw new BadRequestException('labourAmount cannot exceed line amount');
-      }
+    const lineAmount = Number(existing.amount);
+    const currentLabourAmount =
+      existing.labourAmount != null ? Number(existing.labourAmount) : null;
+
+    const syncedLabourAmount = resolveWriteLabourAmount({
+      operation: 'annotate',
+      expenseType: existing.expenseType,
+      accountType: existing.account.accountType,
+      amount: lineAmount,
+      currentLabourAmount,
+      annotateDto: {
+        ...(dto.expenseType !== undefined ? { expenseType: dto.expenseType } : {}),
+        ...(dto.labourAmount !== undefined ? { labourAmount: dto.labourAmount } : {}),
+      },
+    });
+
+    const effectiveLabourAmount =
+      syncedLabourAmount !== undefined ? syncedLabourAmount : currentLabourAmount;
+
+    if (effectiveLabourAmount !== null && effectiveLabourAmount > lineAmount) {
+      throw new BadRequestException('labourAmount cannot exceed line amount');
     }
 
     if (dto.isServiceContract === true) {
@@ -131,14 +176,17 @@ export class BudgetLinesService extends TenantAwareService {
       }
     }
 
-    const changes = this.diffAnnotationFields(existing, dto);
-
     const data: Record<string, unknown> = {};
     for (const field of ANNOTATION_FIELDS) {
       if (field in dto) {
         data[field] = (dto as any)[field] ?? null;
       }
     }
+    if (syncedLabourAmount !== undefined) {
+      data.labourAmount = syncedLabourAmount;
+    }
+
+    const changes = this.diffAnnotationFields(existing, data);
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.budgetLine.update({
@@ -230,6 +278,15 @@ export class BudgetLinesService extends TenantAwareService {
     return line;
   }
 
+  private async loadLineWithAccount(versionId: string, lineId: string) {
+    const line = await this.prisma.budgetLine.findFirst({
+      where: this.tenantFilter({ id: lineId, budgetVersionId: versionId }),
+      include: { account: { select: { accountType: true } } },
+    });
+    if (!line) throw new NotFoundException('Budget line not found');
+    return line;
+  }
+
   private async assertVersionBelongsToBudget(budgetId: string, versionId: string) {
     const version = await this.prisma.budgetVersion.findFirst({
       where: this.tenantFilter({ id: versionId, budgetId }),
@@ -246,18 +303,23 @@ export class BudgetLinesService extends TenantAwareService {
 
   private diffAnnotationFields(
     existing: Record<string, unknown>,
-    dto: AnnotateBudgetLineDto,
+    finalData: Record<string, unknown>,
   ): Array<{ fieldName: string; oldValue: unknown; newValue: unknown }> {
     const changes: Array<{ fieldName: string; oldValue: unknown; newValue: unknown }> = [];
     for (const field of ANNOTATION_FIELDS) {
-      if (!(field in dto)) continue;
+      if (!(field in finalData)) continue;
       const oldVal = (existing as any)[field] ?? null;
-      const newVal = (dto as any)[field] ?? null;
+      const newVal = (finalData as any)[field] ?? null;
       const oldStr = oldVal?.toString() ?? null;
       const newStr = newVal?.toString() ?? null;
-      if (oldStr !== newStr) {
-        changes.push({ fieldName: field, oldValue: oldVal, newValue: newVal });
-      }
+      const numericEqual =
+        field === 'labourAmount' &&
+        labourAmountsEqual(
+          oldVal != null ? Number(oldVal) : null,
+          newVal != null ? Number(newVal) : null,
+        );
+      if (oldStr === newStr || numericEqual) continue;
+      changes.push({ fieldName: field, oldValue: oldVal, newValue: newVal });
     }
     return changes;
   }

@@ -10,6 +10,7 @@ import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { BudgetTemplatesService } from '../budget-templates/budget-templates.service';
 import { BudgetsService } from './budgets.service';
 import { CreateBudgetVersionDto } from './dto/create-budget-version.dto';
+import { resolveWriteLabourAmount } from './labour-amount-sync';
 
 @Injectable()
 export class BudgetVersionsService extends TenantAwareService {
@@ -123,12 +124,28 @@ export class BudgetVersionsService extends TenantAwareService {
 
       const sourceLines = await this.prisma.budgetLine.findMany({
         where: { budgetVersionId: dto.cloneFromVersionId, ...this.softDeleteFilter },
+        include: {
+          account: {
+            select: { accountType: true },
+          },
+        },
       });
 
       if (sourceLines.length > 0) {
         await this.prisma.$transaction(
-          sourceLines.map((line) =>
-            this.prisma.budgetLine.create({
+          sourceLines.map((line) => {
+            const amount = Number(line.amount);
+            const currentLabourAmount =
+              line.labourAmount != null ? Number(line.labourAmount) : null;
+            const syncedLabourAmount = resolveWriteLabourAmount({
+              operation: 'clone',
+              expenseType: line.expenseType,
+              accountType: line.account.accountType,
+              amount,
+              currentLabourAmount,
+            });
+
+            return this.prisma.budgetLine.create({
               data: {
                 budgetVersionId: version.id,
                 budgetAccountId: line.budgetAccountId,
@@ -144,14 +161,14 @@ export class BudgetVersionsService extends TenantAwareService {
                 vendorId: line.vendorId,
                 locationId: line.locationId,
                 productionPhaseId: line.productionPhaseId,
-                labourAmount: line.labourAmount,
+                labourAmount: syncedLabourAmount ?? null,
                 expenseType: line.expenseType,
                 activityType: line.activityType,
                 isServiceContract: line.isServiceContract,
                 sortOrder: line.sortOrder,
               },
-            }),
-          ),
+            });
+          }),
         );
       }
     }
