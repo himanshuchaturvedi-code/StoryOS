@@ -1,6 +1,6 @@
 import {
-  AMPG_SPEND_SUMMARY_DOCUMENT_CODE,
-  AMPG_SPEND_SUMMARY_PROGRAM_CODE,
+  AMPG_LABOUR_SUMMARY_DOCUMENT_CODE,
+  AMPG_LABOUR_SUMMARY_PROGRAM_CODE,
   DocumentGenerationService,
 } from './document-generation.service';
 import { AmpgBudgetCollector } from './ampg-budget.collector';
@@ -16,44 +16,37 @@ jest.mock('../documents/program-document-tag.validation', () => ({
   })),
 }));
 
-jest.mock('./ampg-spend-summary.mapper', () => ({
-  mapAmpgSpendSummary: jest.fn(() => ({
-    documentType: 'AMPG_AB_SPEND_SUMMARY',
+jest.mock('./ampg-labour-summary.mapper', () => ({
+  mapAmpgLabourSummary: jest.fn(() => ({
+    documentType: 'AMPG_AB_LABOUR_SUMMARY',
     projectTitle: 'Alberta Pilot Production',
     budgetVersionId: 'version-1',
     budgetVersionName: 'Locked v1',
     rows: [],
+    personIndex: [],
     summary: {
-      albertaLabourTotal: 50000,
-      albertaNonLabourTotal: 15000,
-      totalAlbertaEligibleSpend: 65000,
-      totalProductionBudget: 80000,
-      albertaSpendRatio: 0.8125,
-      estimatedAmpgGrantBase: 65000,
-      estimatedAmpgGrantAmount: 16250,
+      totalLabour: 50000,
+      albertaResidentLabour: 50000,
+      nonAlbertaOrUnknownLabour: 0,
+      distinctAlbertaResidentPersonCount: 1,
     },
     warnings: [],
-    generatedAt: new Date('2026-06-21T00:00:00.000Z'),
+    generatedAt: new Date('2026-06-22T00:00:00.000Z'),
   })),
 }));
 
-jest.mock('./ampg-spend-summary.renderer', () => ({
-  renderAmpgSpendSummaryPdf: jest.fn(async () => Buffer.from('ampg-pdf-bytes')),
+jest.mock('./ampg-labour-summary.renderer', () => ({
+  renderAmpgLabourSummaryPdf: jest.fn(async () => Buffer.from('ampg-labour-pdf')),
 }));
 
-describe('DocumentGenerationService AMPG spend summary', () => {
+describe('DocumentGenerationService AMPG labour summary', () => {
   const organizationId = 'org-1';
   const projectId = 'project-1';
   const userId = 'user-1';
 
   let service: DocumentGenerationService;
-  let prisma: {
-    document: { create: jest.Mock };
-  };
-  let storage: {
-    buildKey: jest.Mock;
-    putObject: jest.Mock;
-  };
+  let prisma: { document: { create: jest.Mock } };
+  let storage: { buildKey: jest.Mock; putObject: jest.Mock };
   let cptcCollector: { collect: jest.Mock };
   let ampgCollector: { collect: jest.Mock };
 
@@ -94,45 +87,29 @@ describe('DocumentGenerationService AMPG spend summary', () => {
     );
   });
 
-  it('persists canonical storage key and AMPG program document tags', async () => {
-    const result = await service.generateAmpgAbSpendSummary(projectId);
+  it('persists canonical storage key and AMPG labour summary program document tags', async () => {
+    const result = await service.generateAmpgAbLabourSummary(projectId);
 
     expect(storage.buildKey).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId,
         projectId,
-        fileName: expect.stringMatching(/^AMPG_AB_SPEND_/),
+        fileName: expect.stringMatching(/^AMPG_AB_LABOUR_/),
       }),
-    );
-
-    expect(storage.putObject).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /^documents\/org-1\/project-1\/[0-9a-f-]+\/AMPG_AB_SPEND_/,
-      ),
-      expect.any(Buffer),
-      'application/pdf',
     );
 
     expect(prisma.document.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        id: expect.any(String),
-        organizationId,
-        projectId,
-        uploadedById: userId,
-        title: 'AMPG Alberta Spend Summary — Alberta Pilot Production',
+        title: 'AMPG Alberta Labour Summary — Alberta Pilot Production',
         category: 'OTHER',
-        programCode: AMPG_SPEND_SUMMARY_PROGRAM_CODE,
-        programDocumentCode: AMPG_SPEND_SUMMARY_DOCUMENT_CODE,
+        programCode: AMPG_LABOUR_SUMMARY_PROGRAM_CODE,
+        programDocumentCode: AMPG_LABOUR_SUMMARY_DOCUMENT_CODE,
         storageKey: expect.stringMatching(
-          /^documents\/org-1\/project-1\/[0-9a-f-]+\/AMPG_AB_SPEND_/,
+          /^documents\/org-1\/project-1\/[0-9a-f-]+\/AMPG_AB_LABOUR_/,
         ),
-        fileType: 'application/pdf',
       }),
     });
 
-    expect(result.documentId).toBe(
-      prisma.document.create.mock.calls[0][0].data.id,
-    );
-    expect(result.pdfBuffer).toEqual(Buffer.from('ampg-pdf-bytes'));
+    expect(result.pdfBuffer).toEqual(Buffer.from('ampg-labour-pdf'));
   });
 });

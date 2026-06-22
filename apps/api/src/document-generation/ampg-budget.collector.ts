@@ -9,8 +9,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { TenantContext } from '../tenant/tenant.context';
 import type { BudgetLineWithRelations } from './cptc-part-a.collector';
+import { resolveEffectivePersonId } from './ampg-labour-utils';
 
 export type { BudgetLineWithRelations };
+
+export interface ParticipantResidencySnapshot {
+  residencyType: string;
+  country: string;
+  provinceState: string | null;
+}
 
 export interface AmpgBudgetData {
   project: {
@@ -20,7 +27,11 @@ export interface AmpgBudgetData {
   budgetVersionId: string;
   budgetVersionName: string;
   lines: BudgetLineWithRelations[];
+  residencies: Map<string, ParticipantResidencySnapshot>;
 }
+
+const LOCKED_BUDGET_REQUIRED_MESSAGE =
+  'AMPG document generation requires a LOCKED budget version. Lock a budget version before generating.';
 
 @Injectable()
 export class AmpgBudgetCollector extends TenantAwareService {
@@ -38,9 +49,7 @@ export class AmpgBudgetCollector extends TenantAwareService {
     const resolvedVersionId =
       budgetVersionId ?? (await this.resolveLockedBudgetVersionId(projectId));
     if (!resolvedVersionId) {
-      throw new BadRequestException(
-        'AMPG Alberta Spend Summary requires a LOCKED budget version. Lock a budget version before generating.',
-      );
+      throw new BadRequestException(LOCKED_BUDGET_REQUIRED_MESSAGE);
     }
 
     const version = await this.prisma.budgetVersion.findFirst({
@@ -51,7 +60,7 @@ export class AmpgBudgetCollector extends TenantAwareService {
 
     if (version.status !== BudgetVersionStatus.LOCKED) {
       throw new BadRequestException(
-        'AMPG Alberta Spend Summary requires a LOCKED budget version. The selected budget version is not locked.',
+        'AMPG document generation requires a LOCKED budget version. The selected budget version is not locked.',
       );
     }
 
@@ -69,12 +78,51 @@ export class AmpgBudgetCollector extends TenantAwareService {
       orderBy: [{ account: { sortOrder: 'asc' } }, { sortOrder: 'asc' }],
     });
 
+    const residencies = await this.loadResidencies(lines);
+
     return {
       project: { id: project.id, title: project.title },
       budgetVersionId: resolvedVersionId,
       budgetVersionName: version.name,
       lines,
+      residencies,
     };
+  }
+
+  private async loadResidencies(
+    lines: BudgetLineWithRelations[],
+  ): Promise<Map<string, ParticipantResidencySnapshot>> {
+    const personIds = new Set<string>();
+    for (const line of lines) {
+      const effectivePersonId = resolveEffectivePersonId(line);
+      if (effectivePersonId) personIds.add(effectivePersonId);
+    }
+
+    const residencies = new Map<string, ParticipantResidencySnapshot>();
+    if (personIds.size === 0) {
+      return residencies;
+    }
+
+    const rows = await this.prisma.participantResidencyStatus.findMany({
+      where: {
+        organizationId: this.organizationId,
+        personId: { in: [...personIds] },
+        deletedAt: null,
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    for (const row of rows) {
+      if (!residencies.has(row.personId)) {
+        residencies.set(row.personId, {
+          residencyType: row.residencyType,
+          country: row.country,
+          provinceState: row.provinceState,
+        });
+      }
+    }
+
+    return residencies;
   }
 
   private async resolveLockedBudgetVersionId(

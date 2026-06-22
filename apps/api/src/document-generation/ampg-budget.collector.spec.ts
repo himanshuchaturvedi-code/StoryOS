@@ -81,6 +81,9 @@ describe('AmpgBudgetCollector locked budget enforcement', () => {
       budgetLine: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      participantResidencyStatus: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     const collector = createCollector(prisma);
@@ -88,6 +91,7 @@ describe('AmpgBudgetCollector locked budget enforcement', () => {
 
     expect(data.budgetVersionId).toBe('locked-version');
     expect(data.budgetVersionName).toBe('Locked v3');
+    expect(data.residencies).toEqual(new Map());
   });
 
   it('throws NotFoundException when project does not exist', async () => {

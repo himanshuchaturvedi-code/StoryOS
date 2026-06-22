@@ -8,14 +8,12 @@ import { PROGRAM_SPECS } from '../grants/estimators/program-specs';
 import { budgetLineToSpendRecord } from '../calculators/spend-record.projection';
 import type { AmpgBudgetData } from './ampg-budget.collector';
 import type { BudgetLineWithRelations } from './cptc-part-a.collector';
+import { isAlbertaProvince } from './ampg-labour-utils';
 
 const AMPG_PROGRAM_CODE = 'AMPG';
 const DEFAULT_AMPG_GRANT_RATE = 0.25;
 
-export function isAlbertaProvince(provinceState: string | null | undefined): boolean {
-  if (!provinceState) return false;
-  return provinceState === 'CA-AB' || provinceState === 'AB';
-}
+export { isAlbertaProvince } from './ampg-labour-utils';
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;

@@ -61,8 +61,25 @@ export class DocumentGenerationController {
       return res.status(HttpStatus.OK).send(result.pdfBuffer);
     }
 
+    if (documentType === 'AMPG_AB_LABOUR_SUMMARY') {
+      const result = await this.service.generateAmpgAbLabourSummary(
+        projectId,
+        budgetVersionId,
+      );
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${result.fileName}"`,
+        'Content-Length': result.pdfBuffer.length.toString(),
+        'X-Document-Id': result.documentId,
+        'X-Document-Warnings': JSON.stringify(result.warnings),
+      });
+
+      return res.status(HttpStatus.OK).send(result.pdfBuffer);
+    }
+
     return res.status(HttpStatus.BAD_REQUEST).json({
-      message: `Unsupported document type: ${documentType}. Currently supported: CPTC_PART_A, AMPG_AB_SPEND_SUMMARY`,
+      message: `Unsupported document type: ${documentType}. Currently supported: CPTC_PART_A, AMPG_AB_SPEND_SUMMARY, AMPG_AB_LABOUR_SUMMARY`,
     });
   }
 }

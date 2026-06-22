@@ -7,9 +7,13 @@ import type { BocAllocationTrace, BocSummaryLineDefinition } from './boc-registr
 
 export * from './boc-registry';
 
-export type DocumentTypeCode = 'CPTC_PART_A' | 'AMPG_AB_SPEND_SUMMARY';
+export type DocumentTypeCode =
+  | 'CPTC_PART_A'
+  | 'AMPG_AB_SPEND_SUMMARY'
+  | 'AMPG_AB_LABOUR_SUMMARY';
 
 export * from './ampg-spend-summary';
+export * from './ampg-labour-summary';
 
 export interface DocumentWarning {
   fieldId?: string;

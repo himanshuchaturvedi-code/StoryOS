@@ -1,4 +1,4 @@
-import type { AmpgBudgetData } from '../ampg-budget.collector';
+import type { AmpgBudgetData, ParticipantResidencySnapshot } from '../ampg-budget.collector';
 import { buildBudgetLine } from './cptc-part-a.fixtures';
 
 export function buildAmpgBudgetData(
@@ -10,7 +10,38 @@ export function buildAmpgBudgetData(
     budgetVersionId: overrides.budgetVersionId ?? 'version-1',
     budgetVersionName: overrides.budgetVersionName ?? 'Locked v1',
     lines,
+    residencies: overrides.residencies ?? new Map(),
   };
+}
+
+export function buildAlbertaResidency(
+  personId: string,
+  overrides: Partial<ParticipantResidencySnapshot> = {},
+): [string, ParticipantResidencySnapshot] {
+  return [
+    personId,
+    {
+      residencyType: 'CITIZEN',
+      country: 'CA',
+      provinceState: 'CA-AB',
+      ...overrides,
+    },
+  ];
+}
+
+export function buildOntarioResidency(
+  personId: string,
+  overrides: Partial<ParticipantResidencySnapshot> = {},
+): [string, ParticipantResidencySnapshot] {
+  return [
+    personId,
+    {
+      residencyType: 'CITIZEN',
+      country: 'CA',
+      provinceState: 'CA-ON',
+      ...overrides,
+    },
+  ];
 }
 
 export function buildAlbertaLine(
