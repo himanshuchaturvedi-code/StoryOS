@@ -219,6 +219,7 @@ export default function FundingApplicationDetailPage({
         <ProgramDocumentChecklistPanel
           projectId={projectId}
           programs={[{ programCode, programName }]}
+          enableCptcGeneration={programCode === 'CPTC'}
         />
       </div>
     </div>

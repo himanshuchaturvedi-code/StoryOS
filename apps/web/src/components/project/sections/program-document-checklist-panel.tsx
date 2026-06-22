@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
+import {
+  CPTC_BOC_DOCUMENT_CODE,
+  generateCptcPartA,
+  type CptcGenerationWarning,
+} from '@/lib/generate-cptc-part-a';
+import { Button } from '@storyos/ui';
 import {
   DOCUMENT_CHECKLIST_PROGRAM_CODES,
   normalizeChecklistProgramCode,
@@ -52,6 +58,8 @@ interface DocumentChecklistResponse {
 interface ProgramDocumentChecklistPanelProps {
   projectId: string;
   programs: ChecklistProgramRef[];
+  /** When true, CPTC applications can generate CAVCO Part A from the checklist. */
+  enableCptcGeneration?: boolean;
 }
 
 function statusBadgeClass(status: DocumentChecklistItemStatus) {
@@ -122,15 +130,29 @@ function collectSanitizedWarnings(checklist: DocumentChecklistResponse): string[
   return [...warnings];
 }
 
+function warningSeverityClass(severity: CptcGenerationWarning['severity']) {
+  if (severity === 'error') return 'text-red-800';
+  if (severity === 'info') return 'text-blue-800';
+  return 'text-amber-900';
+}
+
 function ProgramChecklistCard({
   checklist,
   programName,
+  enableCptcGeneration,
+  isGenerating,
+  onGenerateCptcBoc,
 }: {
   checklist: DocumentChecklistResponse;
   programName: string;
+  enableCptcGeneration: boolean;
+  isGenerating: boolean;
+  onGenerateCptcBoc?: () => void;
 }) {
   const warnings = collectSanitizedWarnings(checklist);
   const stagesWithDocs = checklist.stages.filter((stage) => stage.documents.length > 0);
+  const canGenerateCptc =
+    enableCptcGeneration && checklist.programCode === 'CPTC' && onGenerateCptcBoc;
 
   return (
     <article className="rounded-md border border-gray-100 bg-gray-50/50 p-4">
@@ -185,22 +207,40 @@ function ProgramChecklistCard({
                   if (a.status !== 'MISSING' && b.status === 'MISSING') return 1;
                   return 0;
                 })
-                .map((doc) => (
-                <li
-                  key={doc.documentCode}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 bg-white px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-gray-900">{doc.label}</div>
-                    <div className="text-xs text-gray-400">{levelLabel(doc.level)}</div>
-                  </div>
-                  <span
-                    className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(doc.status)}`}
-                  >
-                    {statusLabel(doc.status)}
-                  </span>
-                </li>
-              ))}
+                .map((doc) => {
+                  const showGenerate =
+                    canGenerateCptc && doc.documentCode === CPTC_BOC_DOCUMENT_CODE;
+
+                  return (
+                    <li
+                      key={doc.documentCode}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 bg-white px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-gray-900">{doc.label}</div>
+                        <div className="text-xs text-gray-400">{levelLabel(doc.level)}</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {showGenerate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isGenerating}
+                            onClick={onGenerateCptcBoc}
+                          >
+                            {isGenerating ? 'Generating…' : 'Generate'}
+                          </Button>
+                        )}
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(doc.status)}`}
+                        >
+                          {statusLabel(doc.status)}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
             </ul>
           </div>
         ))}
@@ -212,6 +252,7 @@ function ProgramChecklistCard({
 export function ProgramDocumentChecklistPanel({
   projectId,
   programs,
+  enableCptcGeneration = false,
 }: ProgramDocumentChecklistPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [checklists, setChecklists] = useState<
@@ -219,6 +260,14 @@ export function ProgramDocumentChecklistPanel({
   >({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generationWarnings, setGenerationWarnings] = useState<
+    CptcGenerationWarning[] | null
+  >(null);
+  const [lastGeneratedFileName, setLastGeneratedFileName] = useState<string | null>(
+    null,
+  );
 
   const applicablePrograms = useMemo(
     () =>
@@ -240,49 +289,58 @@ export function ProgramDocumentChecklistPanel({
     [applicablePrograms],
   );
 
-  useEffect(() => {
+  const loadChecklists = useCallback(async () => {
     if (!programCodesKey) {
       setChecklists({});
       return;
     }
 
-    let isMounted = true;
-
-    async function loadChecklists() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const entries = await Promise.all(
-          applicablePrograms.map(async (program) => {
-            try {
-              const checklist = await apiClient.get<DocumentChecklistResponse>(
-                `/projects/${projectId}/programs/by-code/${program.programCode}/document-checklist`,
-              );
-              return [program.programCode, checklist] as const;
-            } catch {
-              return [program.programCode, null] as const;
-            }
-          }),
-        );
-        if (isMounted) {
-          setChecklists(Object.fromEntries(entries));
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(
-            err instanceof Error ? err.message : 'Failed to load application documents',
-          );
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const entries = await Promise.all(
+        applicablePrograms.map(async (program) => {
+          try {
+            const checklist = await apiClient.get<DocumentChecklistResponse>(
+              `/projects/${projectId}/programs/by-code/${program.programCode}/document-checklist`,
+            );
+            return [program.programCode, checklist] as const;
+          } catch {
+            return [program.programCode, null] as const;
+          }
+        }),
+      );
+      setChecklists(Object.fromEntries(entries));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to load application documents',
+      );
+    } finally {
+      setIsLoading(false);
     }
+  }, [applicablePrograms, programCodesKey, projectId]);
 
+  useEffect(() => {
     loadChecklists();
-    return () => {
-      isMounted = false;
-    };
-  }, [projectId, programCodesKey, applicablePrograms]);
+  }, [loadChecklists]);
+
+  const handleGenerateCptcBoc = useCallback(async () => {
+    setIsGenerating(true);
+    setGenerateError(null);
+    setGenerationWarnings(null);
+    setLastGeneratedFileName(null);
+
+    try {
+      const result = await generateCptcPartA(projectId);
+      setGenerationWarnings(result.warnings);
+      setLastGeneratedFileName(result.fileName);
+      await loadChecklists();
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate document');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [loadChecklists, projectId]);
 
   if (applicablePrograms.length === 0) {
     return null;
@@ -315,9 +373,38 @@ export function ProgramDocumentChecklistPanel({
       {isExpanded && (
         <div className="space-y-4 border-t border-gray-100 px-5 py-4">
           <p className="text-xs text-gray-500">
-            Read-only checklist for program application packages. Upload documents from the
-            Documents tab; matching is based on document type and project uploads.
+            {enableCptcGeneration
+              ? 'Upload documents from the Documents tab, or generate CAVCO Part A Breakdown of Costs from a locked budget.'
+              : 'Upload documents from the Documents tab; matching is based on document type and project uploads.'}
           </p>
+
+          {generateError && (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {generateError}
+            </p>
+          )}
+
+          {lastGeneratedFileName && !generateError && (
+            <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              Downloaded {lastGeneratedFileName}. Checklist refreshed.
+            </p>
+          )}
+
+          {generationWarnings && generationWarnings.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+              <p className="font-medium text-amber-900">Generation warnings</p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {generationWarnings.map((warning, index) => (
+                  <li
+                    key={`${warning.message}-${index}`}
+                    className={warningSeverityClass(warning.severity)}
+                  >
+                    {warning.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {isLoading && (
             <p className="text-sm text-gray-500">Loading application document checklists…</p>
@@ -347,6 +434,13 @@ export function ProgramDocumentChecklistPanel({
                   key={program.programCode}
                   checklist={checklist}
                   programName={program.programName}
+                  enableCptcGeneration={enableCptcGeneration}
+                  isGenerating={isGenerating}
+                  onGenerateCptcBoc={
+                    enableCptcGeneration && program.programCode === 'CPTC'
+                      ? handleGenerateCptcBoc
+                      : undefined
+                  }
                 />
               );
             })}
