@@ -103,13 +103,13 @@ describe('DocumentGenerationService Slice 2', () => {
       expect.objectContaining({
         organizationId,
         projectId,
-        fileName: expect.stringMatching(/^CPTC_Part_A_BOC_/),
+        fileName: expect.stringMatching(/^CPTC_BOC_01F21_/),
       }),
     );
 
     expect(storage.putObject).toHaveBeenCalledWith(
       expect.stringMatching(
-        /^documents\/org-1\/project-1\/[0-9a-f-]+\/CPTC_Part_A_BOC_/,
+        /^documents\/org-1\/project-1\/[0-9a-f-]+\/CPTC_BOC_01F21_/,
       ),
       expect.any(Buffer),
       'application/pdf',
@@ -121,11 +121,12 @@ describe('DocumentGenerationService Slice 2', () => {
         organizationId,
         projectId,
         uploadedById: userId,
+        title: 'CPTC BOC 01F21 — Breakdown of Costs — Live Action — Test Production',
         category: 'CAVCO_PART_A',
         programCode: CPTC_BOC_PROGRAM_CODE,
         programDocumentCode: CPTC_BOC_DOCUMENT_CODE,
         storageKey: expect.stringMatching(
-          /^documents\/org-1\/project-1\/[0-9a-f-]+\/CPTC_Part_A_BOC_/,
+          /^documents\/org-1\/project-1\/[0-9a-f-]+\/CPTC_BOC_01F21_/,
         ),
         fileType: 'application/pdf',
       }),

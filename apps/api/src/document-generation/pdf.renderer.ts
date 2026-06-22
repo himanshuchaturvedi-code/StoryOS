@@ -53,6 +53,22 @@ function pct(n: number): string {
   return (n * 100).toFixed(1) + '%';
 }
 
+export function buildCptcPartAPdfHeaderLines(doc: CptcPartADocument): string[] {
+  return [
+    doc.formLabel.toUpperCase(),
+    `Form ${doc.formCode}`,
+    `Production: ${doc.projectTitle}`,
+    `Budget: ${doc.budgetVersionName} (LOCKED)`,
+    `Generated: ${doc.generatedAt.toISOString().slice(0, 10)}`,
+  ];
+}
+
+export function buildCptcPartAPdfSummaryRows(doc: CptcPartADocument): string[][] {
+  return doc.summaryLineDefinitions.map((definition) =>
+    summaryRowValues(definition, doc.summary),
+  );
+}
+
 function summaryRowValues(
   definition: BocSummaryLineDefinition,
   summary: BocSummary,
@@ -161,38 +177,19 @@ export async function renderCptcPartAPdf(
   let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
 
-  page.drawText(doc.formLabel.toUpperCase(), {
-    x: startX,
-    y,
-    size: TITLE_FONT_SIZE,
-    font: boldFont,
-    color: black,
-  });
-  y -= 16;
-
-  page.drawText(`Production: ${doc.projectTitle}`, {
-    x: startX,
-    y,
-    size: 9,
-    font,
-    color: black,
-  });
-  y -= 12;
-
-  page.drawText(`Budget: ${doc.budgetVersionName} (LOCKED)`, {
-    x: startX,
-    y,
-    size: 8,
-    font,
-    color: rgb(0.3, 0.3, 0.3),
-  });
-  y -= 12;
-
-  page.drawText(
-    `Generated: ${doc.generatedAt.toISOString().slice(0, 10)}`,
-    { x: startX, y, size: 7, font, color: rgb(0.4, 0.4, 0.4) },
-  );
-  y -= 20;
+  const headerLines = buildCptcPartAPdfHeaderLines(doc);
+  for (let i = 0; i < headerLines.length; i++) {
+    const line = headerLines[i]!;
+    page.drawText(line, {
+      x: startX,
+      y,
+      size: i === 0 ? TITLE_FONT_SIZE : i === 1 ? 8 : i === 2 ? 9 : 7,
+      font: i <= 1 ? boldFont : font,
+      color: i >= headerLines.length - 2 && i > 2 ? rgb(0.4, 0.4, 0.4) : black,
+    });
+    y -= i === 0 ? 16 : i === 2 ? 12 : 12;
+  }
+  y -= 8;
 
   const headerTop = y;
   page.drawRectangle({
@@ -282,45 +279,10 @@ export async function renderCptcPartAPdf(
   }
 
   y -= 6;
-  const s: BocSummary = doc.summary;
-  const summaryDefinitions =
-    doc.summaryLineDefinitions.length > 0
-      ? doc.summaryLineDefinitions
-      : [
-          {
-            code: '11.0',
-            label: 'Total cost of production',
-            formula: 'SUM_LINE_TOTALS' as const,
-          },
-          {
-            code: '11.1',
-            label: 'Total services (Key Creative Canadian + Non-Canadian)',
-            formula: 'SUM_KEY_CREATIVE_COLUMNS' as const,
-          },
-          {
-            code: '11.2',
-            label: 'Ratio % (Canadian to non-Canadian of Total Services)',
-            formula: 'RATIO_KEY_CREATIVE_CANADIAN' as const,
-          },
-          {
-            code: '11.3',
-            label: 'Total post-production / laboratory',
-            formula: 'SUM_POST_LAB_COLUMNS' as const,
-          },
-          {
-            code: '11.4',
-            label: 'Ratio % (Canadian to non-Canadian of Total Post/Lab)',
-            formula: 'RATIO_POST_LAB_CANADIAN' as const,
-          },
-        ];
+  const summaryRows = buildCptcPartAPdfSummaryRows(doc);
 
-  for (let i = 0; i < summaryDefinitions.length; i++) {
-    const definition = summaryDefinitions[i]!;
-    drawRow(
-      summaryRowValues(definition, s),
-      i === 0,
-      i === 0 ? headerBg : undefined,
-    );
+  for (let i = 0; i < summaryRows.length; i++) {
+    drawRow(summaryRows[i]!, i === 0, i === 0 ? headerBg : undefined);
   }
 
   if (doc.warnings.length > 0) {

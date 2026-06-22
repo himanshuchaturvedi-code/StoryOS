@@ -8,6 +8,10 @@ import { assertValidProgramDocumentTag } from '../documents/program-document-tag
 import { loadCptcBocRegistryForForm } from '@storyos/program-registry';
 import { CptcPartACollector } from './cptc-part-a.collector';
 import { resolveCptcBocFormSelection } from './cptc-boc-form-selection';
+import {
+  buildCptcBocDocumentTitle,
+  buildCptcBocFileName,
+} from './cptc-boc-document-metadata';
 import { mapCptcPartAWithRegistry } from './cptc-part-a.mapper-v2';
 import { renderCptcPartAPdf } from './pdf.renderer';
 
@@ -46,7 +50,11 @@ export class DocumentGenerationService extends TenantAwareService {
 
     const pdfBuffer = await renderCptcPartAPdf(mapped);
 
-    const fileName = `CPTC_Part_A_BOC_${sanitize(data.project.title)}_${dateStamp()}.pdf`;
+    const fileName = buildCptcBocFileName({
+      formCode: mapped.formCode,
+      projectTitle: data.project.title,
+      generatedAt: mapped.generatedAt,
+    });
     const documentId = crypto.randomUUID();
     const storageKey = this.storage.buildKey({
       organizationId: this.organizationId,
@@ -68,7 +76,11 @@ export class DocumentGenerationService extends TenantAwareService {
         organizationId: this.organizationId,
         projectId,
         uploadedById: this.tenant.userId!,
-        title: `CPTC Part A — ${data.project.title}`,
+        title: buildCptcBocDocumentTitle({
+          formCode: mapped.formCode,
+          formLabel: mapped.formLabel,
+          projectTitle: data.project.title,
+        }),
         fileName,
         fileType: 'application/pdf',
         fileSize: pdfBuffer.length,
@@ -89,10 +101,4 @@ export class DocumentGenerationService extends TenantAwareService {
   }
 }
 
-function sanitize(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
-}
-
-function dateStamp(): string {
-  return new Date().toISOString().slice(0, 10).replace(/-/g, '');
-}
+export { buildCptcBocDocumentTitle, buildCptcBocFileName } from './cptc-boc-document-metadata';
