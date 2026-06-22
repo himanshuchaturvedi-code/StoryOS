@@ -53,6 +53,15 @@ function pct(n: number): string {
   return (n * 100).toFixed(1) + '%';
 }
 
+/** Standard PDF fonts only encode WinAnsi; normalize common Unicode punctuation. */
+export function sanitizePdfText(text: string): string {
+  return text
+    .replace(/\u2265/g, '>=')
+    .replace(/\u2264/g, '<=')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...');
+}
+
 export function buildCptcPartAPdfHeaderLines(doc: CptcPartADocument): string[] {
   return [
     doc.formLabel.toUpperCase(),
@@ -180,7 +189,7 @@ export async function renderCptcPartAPdf(
   const headerLines = buildCptcPartAPdfHeaderLines(doc);
   for (let i = 0; i < headerLines.length; i++) {
     const line = headerLines[i]!;
-    page.drawText(line, {
+    page.drawText(sanitizePdfText(line), {
       x: startX,
       y,
       size: i === 0 ? TITLE_FONT_SIZE : i === 1 ? 8 : i === 2 ? 9 : 7,
@@ -206,7 +215,7 @@ export async function renderCptcPartAPdf(
   for (const col of COLUMNS) {
     const lines = col.label.split('\n');
     lines.forEach((line, i) => {
-      page.drawText(line, {
+      page.drawText(sanitizePdfText(line), {
         x: colX + 3,
         y: headerTop - 12 - i * 10,
         size: HEADER_FONT_SIZE,
@@ -253,7 +262,7 @@ export async function renderCptcPartAPdf(
     const rowFont = isBold ? boldFont : font;
     for (let i = 0; i < COLUMNS.length; i++) {
       const col = COLUMNS[i]!;
-      const val = values[i] ?? '';
+      const val = sanitizePdfText(values[i] ?? '');
       const isNumeric = i >= 2;
       const textWidth = rowFont.widthOfTextAtSize(val, FONT_SIZE);
       const textX = isNumeric
@@ -306,7 +315,7 @@ export async function renderCptcPartAPdf(
         page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
         y = PAGE_HEIGHT - MARGIN;
       }
-      page.drawText(`• ${w.message}`, {
+      page.drawText(sanitizePdfText(`• ${w.message}`), {
         x: startX + 4,
         y,
         size: 7,

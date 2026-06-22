@@ -7,11 +7,17 @@ import { loadCptcBocRegistryForForm } from '@storyos/program-registry';
 import {
   buildCptcBocBudgetFormWarnings,
   resolveCptcBocFormSelection,
+  sumLiveActionProductionSectionSpend,
   type ProjectFormatSnapshot,
 } from './cptc-boc-form-selection';
 import { mapCptcPartAWithRegistry } from './cptc-part-a.mapper-v2';
 import { renderCptcPartAPdf } from './pdf.renderer';
 import { buildBudgetLine, buildCptcPartAData } from './__fixtures__/cptc-part-a.fixtures';
+import {
+  buildHybridCptcPartAData,
+  buildHybridProjectFormat,
+  buildRepresentativeHybridBudgetLines,
+} from './__fixtures__/cptc-part-a-hybrid.fixtures';
 
 function format(overrides: Partial<ProjectFormatSnapshot> = {}): ProjectFormatSnapshot {
   return {
@@ -100,6 +106,95 @@ describe('resolveCptcBocFormSelection', () => {
     );
     expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_LIVE_ACTION);
     expect(selection.warnings.some((w) => /Hybrid project/i.test(w.message))).toBe(true);
+  });
+});
+
+describe('resolveCptcBocFormSelection (Slice 5G hybrid QA)', () => {
+  it('warns on live-action projects with animation section spend', () => {
+    const selection = resolveCptcBocFormSelection(format(), [
+      buildBudgetLine({
+        amount: 7500,
+        account: { code: '55.10', name: 'Key Animator/Key Posing Artist' },
+      }),
+    ]);
+
+    expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_LIVE_ACTION);
+    expect(selection.warnings.some((w) => /52–59/i.test(w.message))).toBe(true);
+  });
+
+  it('warns on animation projects with live-action production section spend', () => {
+    const selection = resolveCptcBocFormSelection(
+      {
+        formatType: FormatType.ANIMATION_FEATURE,
+        isLiveAction: false,
+        hasAnimation: true,
+        animationPercentage: null,
+      },
+      [
+        buildBudgetLine({
+          amount: 9000,
+          account: { code: '23.01', name: 'Key Grip' },
+        }),
+      ],
+    );
+
+    expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_ANIMATION);
+    expect(selection.warnings.some((w) => /12–51/i.test(w.message))).toBe(true);
+  });
+
+  it('selects 01F22 for hybrid projects above 50% animation with predominant-format warning', () => {
+    const lines = buildRepresentativeHybridBudgetLines();
+    const selection = resolveCptcBocFormSelection(buildHybridProjectFormat(65), lines);
+
+    expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_ANIMATION);
+    expect(selection.reason).toBe('hybrid_animation_percentage');
+    expect(selection.warnings.some((w) => /predominant format is animation/i.test(w.message))).toBe(
+      true,
+    );
+    expect(selection.warnings.some((w) => /12–51/i.test(w.message))).toBe(true);
+  });
+
+  it('selects 01F21 for hybrid projects below 50% animation with animation spend warning', () => {
+    const lines = buildRepresentativeHybridBudgetLines();
+    const selection = resolveCptcBocFormSelection(buildHybridProjectFormat(35), lines);
+
+    expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_LIVE_ACTION);
+    expect(selection.reason).toBe('hybrid_live_action_percentage');
+    expect(selection.warnings.some((w) => /predominant format is live action/i.test(w.message))).toBe(
+      true,
+    );
+    expect(selection.warnings.some((w) => /52–59/i.test(w.message))).toBe(true);
+  });
+
+  it('defaults hybrid projects without animation percentage to 01F21 with ambiguous warnings', () => {
+    const selection = resolveCptcBocFormSelection(buildHybridProjectFormat(null), []);
+
+    expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_LIVE_ACTION);
+    expect(selection.reason).toBe('hybrid_ambiguous');
+    expect(selection.warnings.filter((w) => /ambiguous/i.test(w.message)).length).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it('defaults missing ProjectFormat to 01F21 with warning', () => {
+    const selection = resolveCptcBocFormSelection(null, []);
+    expect(selection.formCode).toBe(CPTC_BOC_FORM_CODE_LIVE_ACTION);
+    expect(selection.warnings.some((w) => /not set/i.test(w.message))).toBe(true);
+  });
+
+  it('maps hybrid fixture end-to-end with form-specific warnings on the generated document', () => {
+    const data = buildHybridCptcPartAData(
+      buildRepresentativeHybridBudgetLines(),
+      65,
+    );
+    const selection = resolveCptcBocFormSelection(data.projectFormat, data.lines);
+    const registry = loadCptcBocRegistryForForm(selection.formCode);
+    const doc = mapCptcPartAWithRegistry(data, registry);
+    doc.warnings.unshift(...selection.warnings);
+
+    expect(doc.formCode).toBe('01F22');
+    expect(doc.warnings.some((w) => /12–51/i.test(w.message))).toBe(true);
+    expect(sumLiveActionProductionSectionSpend(data.lines)).toBe(12000);
   });
 });
 

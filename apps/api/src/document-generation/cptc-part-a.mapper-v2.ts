@@ -391,7 +391,7 @@ export function mapCptcPartAWithRegistry(
   if (unmappedCount > 0) {
     warnings.push({
       severity: 'warning',
-      message: `${unmappedCount} budget line(s) from unmapped Telefilm account(s) were excluded from the 01F21 Breakdown of Costs (total ${formatCurrency(unmappedTotal)}).`,
+      message: `${unmappedCount} budget line(s) from unmapped Telefilm account(s) were excluded from the ${registry.meta.formCode} Breakdown of Costs (total ${formatCurrency(unmappedTotal)}).`,
     });
   }
 
@@ -405,14 +405,14 @@ export function mapCptcPartAWithRegistry(
   if (ambiguousMappingCount > 0) {
     warnings.push({
       severity: 'info',
-      message: `${ambiguousMappingCount} budget line(s) matched multiple 01F21 form lines; amounts were allocated to the primary registry mapping.`,
+      message: `${ambiguousMappingCount} budget line(s) matched multiple ${registry.meta.formCode} form lines; amounts were allocated to the primary registry mapping.`,
     });
   }
 
   if (columnConstraintCount > 0) {
     warnings.push({
       severity: 'warning',
-      message: `${columnConstraintCount} budget line portion(s) could not be placed in an allowed column for their 01F21 form line and were omitted.`,
+      message: `${columnConstraintCount} budget line portion(s) could not be placed in an allowed column for their ${registry.meta.formCode} form line and were omitted.`,
     });
   }
 

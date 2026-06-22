@@ -12,6 +12,7 @@ import {
   buildCptcPartAPdfHeaderLines,
   buildCptcPartAPdfSummaryRows,
   renderCptcPartAPdf,
+  sanitizePdfText,
 } from './pdf.renderer';
 
 function emptySummary() {
@@ -155,5 +156,11 @@ describe('renderCptcPartAPdf (Slice 5F registry-driven presentation)', () => {
     const pdf = await renderCptcPartAPdf(doc);
     expect(pdfLooksValid(pdf)).toBe(true);
     expect(buildCptcPartAPdfHeaderLines(doc)[1]).toBe('Form 01F21');
+  });
+
+  it('sanitizes Unicode punctuation for Standard PDF fonts', () => {
+    expect(sanitizePdfText('Hybrid ≥50%; sections 52–59 and 12–51')).toBe(
+      'Hybrid >=50%; sections 52-59 and 12-51',
+    );
   });
 });
