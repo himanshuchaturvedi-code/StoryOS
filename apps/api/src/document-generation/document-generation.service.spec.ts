@@ -15,8 +15,8 @@ jest.mock('../documents/program-document-tag.validation', () => ({
   })),
 }));
 
-jest.mock('./cptc-part-a.mapper', () => ({
-  mapCptcPartA: jest.fn(() => ({
+jest.mock('./cptc-part-a.mapper-v2', () => ({
+  mapCptcPartAWithRegistry: jest.fn(() => ({
     documentType: 'CPTC_PART_A',
     projectTitle: 'Test Production',
     budgetVersionId: 'version-1',

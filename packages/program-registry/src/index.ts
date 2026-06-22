@@ -9,6 +9,12 @@ export {
 } from './validate-cptc-boc-registry';
 export { parseTelefilmTemplateAccounts, type TelefilmTemplateAccount } from './telefilm-template-accounts';
 export { matchAccountPattern, accountMatchesRule, accountMatchesAnyPattern } from './pattern-match';
+export {
+  resolveFormLinesForAccount,
+  resolvePrimaryFormLineForAccount,
+  isLineCodeWithinRange,
+  compareFormLineCodes,
+} from './resolve-form-line';
 export { findMonorepoRoot, resolveFromMonorepoRoot, getDefaultCptcBocRegistryPath } from './paths';
 
 export const CPTC_BOC_REGISTRY_FORM_CODE = '01F21';

@@ -299,29 +299,29 @@ function resolveCanadian(
 /** Exported for unit tests. */
 export function computeSummary(rows: BocRow[]): BocSummary {
   let totalCost = 0;
-  let svcCan = 0;
-  let svcNonCan = 0;
+  let keyCreativeCanadian = 0;
+  let keyCreativeNonCanadian = 0;
   let postCan = 0;
   let postNonCan = 0;
 
   for (const row of rows) {
     if (row.isHeader) continue;
     totalCost += row.total;
-    svcCan += row.servicesCanadian + row.keyCreativeCanadian;
-    svcNonCan += row.servicesNonCanadian + row.keyCreativeNonCanadian;
+    keyCreativeCanadian += row.keyCreativeCanadian;
+    keyCreativeNonCanadian += row.keyCreativeNonCanadian;
     postCan += row.postProductionLabCanadian;
     postNonCan += row.postProductionLabNonCanadian;
   }
 
-  const totalServices = svcCan + svcNonCan;
+  const totalServices = keyCreativeCanadian + keyCreativeNonCanadian;
   const totalPostLab = postCan + postNonCan;
 
   return {
     totalCostOfProduction: totalCost,
-    totalServicesCanadian: svcCan,
-    totalServicesNonCanadian: svcNonCan,
+    totalServicesCanadian: keyCreativeCanadian,
+    totalServicesNonCanadian: keyCreativeNonCanadian,
     totalServices,
-    servicesCanadianRatio: totalServices > 0 ? svcCan / totalServices : 0,
+    servicesCanadianRatio: totalServices > 0 ? keyCreativeCanadian / totalServices : 0,
     totalPostLabCanadian: postCan,
     totalPostLabNonCanadian: postNonCan,
     totalPostLab,

@@ -6,7 +6,7 @@ import { TenantContext } from '../tenant/tenant.context';
 import { StorageService } from '../documents/storage.service';
 import { assertValidProgramDocumentTag } from '../documents/program-document-tag.validation';
 import { CptcPartACollector } from './cptc-part-a.collector';
-import { mapCptcPartA } from './cptc-part-a.mapper';
+import { mapCptcPartAWithRegistry } from './cptc-part-a.mapper-v2';
 import { renderCptcPartAPdf } from './pdf.renderer';
 
 export const CPTC_BOC_PROGRAM_CODE = 'CPTC';
@@ -37,7 +37,7 @@ export class DocumentGenerationService extends TenantAwareService {
   ): Promise<GenerateDocumentResult> {
     const data = await this.collector.collect(projectId, budgetVersionId);
 
-    const mapped = mapCptcPartA(data);
+    const mapped = mapCptcPartAWithRegistry(data);
 
     const pdfBuffer = await renderCptcPartAPdf(mapped);
 

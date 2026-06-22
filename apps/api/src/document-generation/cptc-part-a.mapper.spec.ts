@@ -4,6 +4,7 @@ import {
   mapCptcPartA,
   resolveLineAmountSplit,
 } from './cptc-part-a.mapper';
+import { mapCptcPartAWithRegistry } from './cptc-part-a.mapper-v2';
 import {
   buildBudgetLine,
   buildCptcPartAData,
@@ -48,10 +49,10 @@ describe('computeSummary', () => {
     const summary = computeSummary(rows);
 
     expect(summary.totalCostOfProduction).toBe(850);
-    expect(summary.totalServicesCanadian).toBe(300);
-    expect(summary.totalServicesNonCanadian).toBe(125);
-    expect(summary.totalServices).toBe(425);
-    expect(summary.servicesCanadianRatio).toBeCloseTo(300 / 425);
+    expect(summary.totalServicesCanadian).toBe(100);
+    expect(summary.totalServicesNonCanadian).toBe(50);
+    expect(summary.totalServices).toBe(150);
+    expect(summary.servicesCanadianRatio).toBeCloseTo(100 / 150);
     expect(summary.totalPostLabCanadian).toBe(300);
     expect(summary.totalPostLabNonCanadian).toBe(100);
     expect(summary.totalPostLab).toBe(400);
@@ -162,7 +163,7 @@ describe('resolveLineAmountSplit', () => {
   });
 });
 
-describe('mapCptcPartA integration', () => {
+describe('mapCptcPartA integration (legacy account mapper)', () => {
   it('classifies key creative with residency into Canadian services subtotal', () => {
     const personId = 'person-director';
     const line = buildBudgetLine({
@@ -178,5 +179,57 @@ describe('mapCptcPartA integration', () => {
 
     expect(doc.summary.totalServicesCanadian).toBe(2500);
     expect(doc.rows[0]?.keyCreativeCanadian).toBe(2500);
+  });
+});
+
+describe('mapCptcPartAWithRegistry (Slice 4C)', () => {
+  it('aggregates Telefilm accounts into 01F21 form line codes', () => {
+    const line = buildBudgetLine({
+      amount: 1500,
+      account: { code: '02.01', name: 'Writer(s)', sortOrder: 1 },
+      personId: 'person-writer',
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildCptcPartAData([line], caCitizenResidency('person-writer')),
+    );
+
+    const screenwriterRow = doc.rows.find((row) => row.accountCode === '2.0.a');
+    expect(screenwriterRow?.keyCreativeCanadian).toBe(1500);
+    expect(doc.rows.some((row) => row.accountCode === '02.01')).toBe(false);
+  });
+
+  it('computes 11.1 Total Services from Key Creative columns only', () => {
+    const director = buildBudgetLine({
+      amount: 1000,
+      personId: 'person-director',
+      account: {
+        code: '05.01',
+        name: 'Director',
+        sortOrder: 1,
+        roleMappings: [{ programCode: 'CPTC', roleCode: 'DIRECTOR' } as never],
+      },
+    });
+    const grip = buildBudgetLine({
+      amount: 500,
+      budgetAccountId: 'acct-grip',
+      account: {
+        id: 'acct-grip',
+        code: '24.01',
+        name: 'Grip',
+        sortOrder: 2,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildCptcPartAData([director, grip], caCitizenResidency('person-director')),
+    );
+
+    expect(doc.summary.totalServicesCanadian).toBe(1000);
+    expect(doc.summary.totalServices).toBe(1000);
+    expect(doc.rows.find((row) => row.accountCode === '7.5')?.servicesCanadian).toBe(
+      500,
+    );
   });
 });
