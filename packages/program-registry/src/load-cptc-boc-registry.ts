@@ -10,7 +10,7 @@ import type {
   BocPolicyRoutingOverride,
   BocSummaryFormulaType,
 } from '@storyos/types';
-import { getDefaultCptcBocRegistryPath } from './paths';
+import { getCptcBocRegistryPath, getDefaultCptcBocRegistryPath, type CptcBocFormCode } from './paths';
 
 const VALID_BOC_COLUMN_KEYS: readonly BocColumnKey[] = [
   'keyCreativeCanadian',
@@ -300,6 +300,10 @@ export function loadCptcBocRegistry(filePath?: string): BocFormRegistry {
   const contents = fs.readFileSync(resolvedPath, 'utf8');
   const parsed = yaml.load(contents);
   return parseRegistry(parsed);
+}
+
+export function loadCptcBocRegistryForForm(formCode: CptcBocFormCode): BocFormRegistry {
+  return loadCptcBocRegistry(getCptcBocRegistryPath(formCode));
 }
 
 export function loadCptcBocRegistryFromString(yamlContents: string): BocFormRegistry {

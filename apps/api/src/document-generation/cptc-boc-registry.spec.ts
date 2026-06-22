@@ -1,9 +1,12 @@
 import {
+  CPTC_BOC_FORM_CODE_ANIMATION,
+  CPTC_BOC_FORM_CODE_LIVE_ACTION,
   CPTC_BOC_REGISTRY_TEMPLATE_ID,
   buildRegistryCoverageReport,
   findLineByCode,
   lineMapsAccount,
   loadCptcBocRegistry,
+  loadCptcBocRegistryForForm,
   loadCptcBocRegistryFromString,
   resolvePrimaryFormLineForAccount,
   validateCptcBocRegistry,
@@ -241,5 +244,94 @@ summaryLines:
     expect(policy?.overrides[0]?.interimLine).toBe('72.c');
     expect(policy?.overrides[0]?.officialLine).toBe('9.11');
     expect(findLineByCode(registry, '72.c')).toBeDefined();
+  });
+});
+
+describe('CPTC 01F22 BOC registry (Slice 5B)', () => {
+  const registry = loadCptcBocRegistryForForm(CPTC_BOC_FORM_CODE_ANIMATION);
+
+  it('loads the animation registry with expected metadata', () => {
+    expect(registry.meta.programCode).toBe('CPTC');
+    expect(registry.meta.formCode).toBe('01F22');
+    expect(registry.meta.formLabel).toContain('Animation');
+    expect(registry.meta.templateVersion).toBe(CPTC_BOC_REGISTRY_TEMPLATE_ID);
+    expect(registry.summaryLines.map((line) => line.code)).toEqual([
+      '10.0',
+      '10.1',
+      '10.2',
+      '10.3',
+      '10.4',
+    ]);
+  });
+
+  it('validates the animation registry without errors', () => {
+    const result = validateCptcBocRegistry(registry, {
+      minimumCoveragePercentage: 100,
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('reports 100% coverage for Telefilm animation sections 52–59', () => {
+    const coverage = buildRegistryCoverageReport(registry);
+
+    expect(coverage.coverageEligibleAccounts).toBe(127);
+    expect(coverage.mappedAccounts).toBe(127);
+    expect(coverage.coveragePercentage).toBe(100);
+    expect(coverage.unmappedAccounts).toBe(0);
+  });
+
+  it('includes representative Telefilm animation section mappings', () => {
+    const voiceRecording = findLineByCode(registry, '7.4');
+    const productionUnit = findLineByCode(registry, '7.3');
+    const artDesign = findLineByCode(registry, '7.1.c');
+    const twoDAnimation = findLineByCode(registry, '7.5');
+    const threeDAnimation = findLineByCode(registry, '7.6');
+    const mocap = findLineByCode(registry, '7.14');
+    const animationFringe = findLineByCode(registry, '7.15');
+    const materials = findLineByCode(registry, '7.21');
+
+    expect(lineMapsAccount(voiceRecording!, '52.05', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+      true,
+    );
+    expect(lineMapsAccount(productionUnit!, '53.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+      true,
+    );
+    expect(lineMapsAccount(artDesign!, '54.05', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(true);
+    expect(lineMapsAccount(twoDAnimation!, '55.10', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+      true,
+    );
+    expect(lineMapsAccount(threeDAnimation!, '56.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+      true,
+    );
+    expect(lineMapsAccount(mocap!, '57.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(true);
+    expect(lineMapsAccount(animationFringe!, '58.95', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+      true,
+    );
+    expect(lineMapsAccount(materials!, '59.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(true);
+  });
+
+  it('declares PN-2022-02 stock footage policy with interim 72.c and official 8.11', () => {
+    const policy = registry.policyNotes?.find((note) => note.id === 'PN-2022-02');
+    expect(policy).toBeDefined();
+    expect(policy?.overrides[0]?.interimLine).toBe('72.c');
+    expect(policy?.overrides[0]?.officialLine).toBe('8.11');
+    expect(findLineByCode(registry, '72.c')).toBeDefined();
+    expect(findLineByCode(registry, '8.11')).toBeDefined();
+  });
+
+  it('declares forceEmpty amortization on form line 9.1', () => {
+    const amortization = findLineByCode(registry, '9.1');
+    expect(amortization?.forceEmpty).toBe(true);
+    expect(amortization?.allowedColumns).toEqual([]);
+    expect(
+      lineMapsAccount(amortization!, '69.01', CPTC_BOC_REGISTRY_TEMPLATE_ID),
+    ).toBe(true);
+  });
+
+  it('preserves default live-action loader behavior', () => {
+    const liveAction = loadCptcBocRegistry();
+    expect(liveAction.meta.formCode).toBe(CPTC_BOC_FORM_CODE_LIVE_ACTION);
   });
 });

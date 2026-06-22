@@ -1,0 +1,795 @@
+meta:
+  programCode: CPTC
+  formCode: "01F22"
+  formLabel: Breakdown of Costs — Animation
+  formVersion: "2023-03-23"
+  registryVersion: "2026.06.1"
+  templateVersion: telefilm-doc-v1
+
+templates:
+  telefilm-doc-v1:
+    sourceFile: templates/standard-budget-template-documentary.xlsx
+    sheetName: TFC Prod. Budget - DETAIL
+    coverageExcludePatterns:
+      - "01.*"
+      - "02.*"
+      - "03.*"
+      - "04.*"
+      - "05.*"
+      - "06.*"
+      - "07.*"
+      - "08.*"
+      - "09.*"
+      - "10.*"
+      - "11.*"
+      - "12.*"
+      - "13.*"
+      - "14.*"
+      - "15.*"
+      - "16.*"
+      - "17.*"
+      - "18.*"
+      - "19.*"
+      - "20.*"
+      - "21.*"
+      - "22.*"
+      - "23.*"
+      - "24.*"
+      - "25.*"
+      - "26.*"
+      - "27.*"
+      - "28.*"
+      - "29.*"
+      - "30.*"
+      - "31.*"
+      - "32.*"
+      - "33.*"
+      - "34.*"
+      - "35.*"
+      - "36.*"
+      - "37.*"
+      - "38.*"
+      - "39.*"
+      - "40.*"
+      - "41.*"
+      - "42.*"
+      - "43.*"
+      - "44.*"
+      - "45.*"
+      - "46.*"
+      - "47.*"
+      - "48.*"
+      - "49.*"
+      - "50.*"
+      - "51.*"
+      - "60.*"
+      - "61.*"
+      - "62.*"
+      - "63.*"
+      - "64.*"
+      - "65.*"
+      - "66.*"
+      - "67.*"
+      - "68.*"
+      - "69.*"
+      - "70.*"
+      - "71.*"
+      - "72.*"
+      - "73.*"
+      - "74.*"
+      - "75.*"
+      - "76.*"
+      - "77.*"
+      - "78.*"
+      - "79.*"
+      - "80.*"
+      - "81.*"
+    unmappedAccountPolicy: WARN
+
+policyNotes:
+  - id: PN-2022-02
+    description: Stock footage may be reported as Other under 72 c until the official 01F22 form is updated.
+    useInterimRouting: true
+    overrides:
+      - match:
+          telefilmPatterns: ["67.*"]
+          accountNamePatterns: ["*stock*footage*"]
+          tags: ["stock_footage"]
+          excludeAccounts: ["67.01", "67.20", "67.90", "67.95"]
+        interimLine: "72.c"
+        officialLine: "8.11"
+
+lines:
+
+  - code: "1.0"
+    label: Story rights/acquisitions
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["01.*"]
+
+  - code: "2.0"
+    label: Scriptwriter/Storyboard
+    isHeader: true
+    allowedColumns: []
+
+  - code: "2.0.a"
+    parentCode: "2.0"
+    label: Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["02.01"]
+        rollups: ["02.90"]
+
+  - code: "2.0.b"
+    parentCode: "2.0"
+    label: Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["02.60", "02.65"]
+
+  - code: "2.0.c"
+    parentCode: "2.0"
+    label: Other expenses
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["02.*"]
+        excludeAccounts: ["02.01", "02.60", "02.65", "02.90"]
+
+  - code: "3.0"
+    label: Development costs
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["03.*"]
+        excludeAccounts: ["03.06"]
+
+  - code: "4.0"
+    label: Producer
+    isHeader: true
+    allowedColumns: []
+
+  - code: "4.0.a"
+    parentCode: "4.0"
+    label: Remuneration & fringe benefits
+    columnFamily: producerRemuneration
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian, servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.05", "04.08"]
+        rollups: ["04.90"]
+
+  - code: "4.0.b"
+    parentCode: "4.0"
+    label: Travel & living expenses
+    columnFamily: producerTravel
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian, servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.60", "04.65"]
+        allowShared: true
+
+  - code: "4.1"
+    label: Co-producer(s)
+    isHeader: true
+    parentCode: "4.0"
+    allowedColumns: []
+
+  - code: "4.1.a"
+    parentCode: "4.1"
+    label: Co-producer(s) — Remuneration & fringe benefits
+    columnFamily: producerRemuneration
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian, servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.10"]
+
+  - code: "4.1.b"
+    parentCode: "4.1"
+    label: Co-producer(s) — Travel & living expenses
+    columnFamily: producerTravel
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian, servicesCanadian, servicesNonCanadian]
+
+  - code: "4.2"
+    label: Line producer(s)
+    isHeader: true
+    parentCode: "4.0"
+    allowedColumns: []
+
+  - code: "4.2.a"
+    parentCode: "4.2"
+    label: Line producer(s) — Remuneration & fringe benefits
+    columnFamily: lineProducerRemuneration
+    allowedColumns: [keyCreativeCanadian, servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.07"]
+
+  - code: "4.2.b"
+    parentCode: "4.2"
+    label: Line producer(s) — Travel & living expenses
+    columnFamily: lineProducerTravel
+    allowedColumns: [keyCreativeCanadian, servicesCanadian, servicesNonCanadian]
+
+  - code: "4.3"
+    label: Executive producer(s)
+    isHeader: true
+    parentCode: "4.0"
+    allowedColumns: []
+
+  - code: "4.3.a"
+    parentCode: "4.3"
+    label: Executive producer(s) — Remuneration & fringe benefits
+    columnFamily: producerServices
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.01"]
+
+  - code: "4.3.b"
+    parentCode: "4.3"
+    label: Executive producer(s) — Travel & living expenses
+    columnFamily: producerTravel
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "4.4"
+    label: Associate producer(s)
+    isHeader: true
+    parentCode: "4.0"
+    allowedColumns: []
+
+  - code: "4.4.a"
+    parentCode: "4.4"
+    label: Associate producer(s) — Remuneration & fringe benefits
+    columnFamily: producerServices
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.15"]
+
+  - code: "4.4.b"
+    parentCode: "4.4"
+    label: Associate producer(s) — Travel & living expenses
+    columnFamily: producerTravel
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "4.5"
+    label: Other producer-related personnel
+    isHeader: true
+    parentCode: "4.0"
+    allowedColumns: []
+
+  - code: "4.5.a"
+    parentCode: "4.5"
+    label: Other producer-related personnel — Remuneration & fringe benefits
+    columnFamily: producerServices
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.16", "04.25"]
+
+  - code: "4.5.b"
+    parentCode: "4.5"
+    label: Other producer-related personnel — Travel & living expenses
+    columnFamily: producerTravel
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "4.6"
+    label: Other producer-related costs
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["04.70", "04.93", "04.95"]
+
+  - code: "5.0"
+    label: Director
+    isHeader: true
+    allowedColumns: []
+
+  - code: "5.0.a"
+    parentCode: "5.0"
+    label: Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["05.01"]
+        rollups: ["05.90"]
+
+  - code: "5.0.b"
+    parentCode: "5.0"
+    label: Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["05.60", "05.65"]
+
+  - code: "5.0.c"
+    parentCode: "5.0"
+    label: Other
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["05.*"]
+        excludeAccounts: ["05.01", "05.60", "05.65", "05.90"]
+
+  - code: "6.0"
+    label: Voices, mock voices, rotoscope talent
+    isHeader: true
+    allowedColumns: []
+
+  - code: "6.1"
+    label: 1st lead voice/performer
+    isHeader: true
+    parentCode: "6.0"
+    allowedColumns: []
+
+  - code: "6.1.a"
+    parentCode: "6.1"
+    label: 1st lead voice — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["06.01", "10.20"]
+        rollups: ["06.90", "10.90"]
+
+  - code: "6.1.b"
+    parentCode: "6.1"
+    label: 1st lead voice — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["06.60", "06.65", "10.60", "10.65"]
+        allowShared: true
+
+  - code: "6.2"
+    label: 2nd lead voice/performer
+    isHeader: true
+    parentCode: "6.0"
+    allowedColumns: []
+
+  - code: "6.2.a"
+    parentCode: "6.2"
+    label: 2nd lead voice — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["10.25"]
+
+  - code: "6.2.b"
+    parentCode: "6.2"
+    label: 2nd lead voice — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["10.60", "10.65"]
+        allowShared: true
+
+  - code: "6.3"
+    label: Other voices (or performers)
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["06.*", "10.*", "11.*"]
+        excludeAccounts: ["06.01", "06.60", "06.65", "06.90", "10.20", "10.25", "10.60", "10.65", "10.70", "10.75", "10.76", "10.90"]
+
+  - code: "7.0"
+    label: Production labour
+    isHeader: true
+    allowedColumns: []
+
+  - code: "7.1"
+    label: Design supervisor
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.1.a"
+    parentCode: "7.1"
+    label: Design supervisor — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["54.01"]
+        rollups: ["54.90"]
+
+  - code: "7.1.b"
+    parentCode: "7.1"
+    label: Design supervisor — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+
+  - code: "7.1.c"
+    parentCode: "7.1"
+    label: Other design labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["54.*"]
+        excludeAccounts: ["54.01", "54.60", "54.61", "54.62", "54.64", "54.90"]
+
+  - code: "7.2"
+    label: Storyboard supervisor
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.2.a"
+    parentCode: "7.2"
+    label: Storyboard supervisor — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["54.60"]
+
+  - code: "7.2.b"
+    parentCode: "7.2"
+    label: Storyboard supervisor — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+
+  - code: "7.2.c"
+    parentCode: "7.2"
+    label: Other storyboard labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["54.61", "54.62", "54.64"]
+
+  - code: "7.3"
+    label: Production labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["53.*"]
+
+  - code: "7.4"
+    label: Voice edit labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["52.*"]
+
+  - code: "7.5"
+    label: Key animation labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["55.*"]
+
+  - code: "7.6"
+    label: Layout & background labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["56.*"]
+
+  - code: "7.7"
+    label: Ass. animation/in-betweening labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.8"
+    label: Animation check, colour check and final check labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.9"
+    label: Photocopy labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.10"
+    label: Matching & repegging labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.11"
+    label: Opaquing (linking & painting) labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.12"
+    label: Office labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.13"
+    label: Camera operator
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.13.a"
+    parentCode: "7.13"
+    label: Camera operator — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+
+  - code: "7.13.b"
+    parentCode: "7.13"
+    label: Camera operator — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+
+  - code: "7.13.c"
+    parentCode: "7.13"
+    label: Other camera labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+
+  - code: "7.14"
+    label: Other production labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["57.*"]
+
+  - code: "7.15"
+    label: Equipment
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["58.*"]
+
+  - code: "7.16"
+    label: Production office
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+
+  - code: "7.17"
+    label: Studio rental
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+
+  - code: "7.18"
+    label: Transportation
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+
+  - code: "7.19"
+    label: Production laboratory
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+
+  - code: "7.20"
+    label: Film/videotape stock
+    allowedColumns: [servicesCanadian, servicesNonCanadian, postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+
+  - code: "7.21"
+    label: Other production costs
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["59.*"]
+
+  - code: "8.0"
+    label: Post-production/lab
+    isHeader: true
+    allowedColumns: []
+
+  - code: "8.1"
+    label: Editorial labour — Film/Video
+    isHeader: true
+    parentCode: "8.0"
+    allowedColumns: []
+
+  - code: "8.1.a"
+    parentCode: "8.1"
+    label: Editorial labour — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["60.10"]
+        rollups: ["60.90"]
+
+  - code: "8.1.b"
+    parentCode: "8.1"
+    label: Editorial labour — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["60.60", "60.65"]
+
+  - code: "8.1.c"
+    parentCode: "8.1"
+    label: Editorial labour — Other costs
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["60.*"]
+        excludeAccounts: ["60.10", "60.60", "60.65", "60.90"]
+
+  - code: "8.2"
+    label: Editorial equipment
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["61.*"]
+
+  - code: "8.3"
+    label: Video post-production (picture)
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["62.*"]
+
+  - code: "8.4"
+    label: Video post-production (sound)
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["63.*"]
+
+  - code: "8.5"
+    label: Special effects/Foley
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["65.*"]
+
+  - code: "8.6"
+    label: Film post-production (picture)
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["64.*"]
+
+  - code: "8.7"
+    label: Film post-production (sound)
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian]
+
+  - code: "8.8"
+    label: Music composer(s)
+    isHeader: true
+    parentCode: "8.0"
+    allowedColumns: []
+
+  - code: "8.8.a"
+    parentCode: "8.8"
+    label: Music composer(s) — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["66.10"]
+        rollups: ["66.90"]
+
+  - code: "8.8.b"
+    parentCode: "8.8"
+    label: Music composer(s) — Travel & living expenses
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["66.60", "66.65", "66.95"]
+
+  - code: "8.8.c"
+    parentCode: "8.8"
+    label: Other music personnel
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["66.01", "66.02", "66.15", "66.20", "66.25", "66.30", "66.40"]
+
+  - code: "8.8.d"
+    parentCode: "8.8"
+    label: Other music expenses
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["66.50", "66.55"]
+
+  - code: "8.9"
+    label: Music rights
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["66.71"]
+
+  - code: "8.10"
+    label: Titles/Opticals
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["67.01", "67.20"]
+        rollups: ["67.90"]
+
+  - code: "8.11"
+    label: Stock footage (official form line — PN-2022-02 fallback target)
+    allowedColumns: [servicesCanadian, servicesNonCanadian, postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+
+  - code: "8.12"
+    label: Final copies
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+
+  - code: "8.13"
+    label: Versioning
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["68.*"]
+
+  - code: "8.14"
+    label: Shipping, customs & communications
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+
+  - code: "8.15"
+    label: Other post-production costs
+    allowedColumns: [postProductionLabCanadian, postProductionLabNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["67.95"]
+
+  - code: "9.0"
+    label: Other expenses
+    isHeader: true
+    allowedColumns: []
+
+  - code: "9.1"
+    label: Amortization/Depreciation
+    forceEmpty: true
+    allowedColumns: []
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["69.*"]
+        allowShared: true
+
+  - code: "72.c"
+    label: Stock footage (interim — PN-2022-02, Other under 72 c)
+    parentCode: "9.4"
+    columnFamily: other
+    allowedColumns: [otherCosts]
+
+  - code: "9.2"
+    label: Unit publicity
+    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["70.*"]
+
+  - code: "9.3"
+    label: General — insurance, accounting & legal, bank charges, etc.
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["71.*"]
+
+  - code: "9.4"
+    label: Indirect costs — interest, corporate overhead, interim financing, contingency, etc.
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["72.*", "80.*"]
+
+  - code: "9.5"
+    label: Completion guarantee
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
+    sources:
+      - templateId: telefilm-doc-v1
+        patterns: ["81.*"]
+
+summaryLines:
+  - code: "10.0"
+    label: Total cost of production
+    formula: SUM_LINE_TOTALS
+    sourceLineRange: ["1.0", "9.5"]
+
+  - code: "10.1"
+    label: Total services (Key Creative Canadian + Non-Canadian)
+    formula: SUM_KEY_CREATIVE_COLUMNS
+
+  - code: "10.2"
+    label: Ratio % (Canadian to non-Canadian of Total Services)
+    formula: RATIO_KEY_CREATIVE_CANADIAN
+
+  - code: "10.3"
+    label: Total post-production / laboratory
+    formula: SUM_POST_LAB_COLUMNS
+
+  - code: "10.4"
+    label: Ratio % (Canadian to non-Canadian of Total Post/Lab)
+    formula: RATIO_POST_LAB_CANADIAN

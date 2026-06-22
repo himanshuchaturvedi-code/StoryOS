@@ -1,4 +1,4 @@
-export { loadCptcBocRegistry, loadCptcBocRegistryFromString } from './load-cptc-boc-registry';
+export { loadCptcBocRegistry, loadCptcBocRegistryForForm, loadCptcBocRegistryFromString } from './load-cptc-boc-registry';
 export {
   validateCptcBocRegistry,
   buildRegistryCoverageReport,
@@ -21,7 +21,16 @@ export {
   resolvePolicyFormLine,
   type PolicyRoutingResolution,
 } from './resolve-policy-routing';
-export { findMonorepoRoot, resolveFromMonorepoRoot, getDefaultCptcBocRegistryPath } from './paths';
+export {
+  findMonorepoRoot,
+  resolveFromMonorepoRoot,
+  getDefaultCptcBocRegistryPath,
+  getCptcBocRegistryPath,
+  CPTC_BOC_FORM_CODE_LIVE_ACTION,
+  CPTC_BOC_FORM_CODE_ANIMATION,
+  type CptcBocFormCode,
+} from './paths';
 
+/** Default CPTC BOC form code used by live-action generation (01F21). */
 export const CPTC_BOC_REGISTRY_FORM_CODE = '01F21';
 export const CPTC_BOC_REGISTRY_TEMPLATE_ID = 'telefilm-doc-v1';

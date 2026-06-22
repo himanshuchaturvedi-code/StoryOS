@@ -24,7 +24,14 @@ const VALID_COLUMN_FAMILIES: readonly BocColumnFamily[] = [
   'other',
 ];
 
-const EXPECTED_SUMMARY_CODES = ['11.0', '11.1', '11.2', '11.3', '11.4'] as const;
+const EXPECTED_SUMMARY_CODES_BY_FORM: Record<string, readonly string[]> = {
+  '01F21': ['11.0', '11.1', '11.2', '11.3', '11.4'],
+  '01F22': ['10.0', '10.1', '10.2', '10.3', '10.4'],
+};
+
+function expectedSummaryCodes(formCode: string): readonly string[] {
+  return EXPECTED_SUMMARY_CODES_BY_FORM[formCode] ?? EXPECTED_SUMMARY_CODES_BY_FORM['01F21']!;
+}
 
 const PRODUCER_COLUMN_FAMILIES: readonly BocColumnFamily[] = [
   'producerRemuneration',
@@ -353,7 +360,7 @@ export function validateCptcBocRegistry(
   }
 
   const summaryCodes = registry.summaryLines.map((line) => line.code);
-  for (const expectedCode of EXPECTED_SUMMARY_CODES) {
+  for (const expectedCode of expectedSummaryCodes(registry.meta.formCode)) {
     if (!summaryCodes.includes(expectedCode)) {
       errors.push(
         issue(

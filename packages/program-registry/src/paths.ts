@@ -24,17 +24,44 @@ export function resolveFromMonorepoRoot(relativePath: string, startDir?: string)
   return path.join(findMonorepoRoot(startDir), relativePath);
 }
 
-export function getDefaultCptcBocRegistryPath(startDir: string = __dirname): string {
-  const candidates = [
-    path.join(startDir, '..', 'cptc', '01F21.live-action.yaml'),
-    path.join(startDir, '..', '..', 'cptc', '01F21.live-action.yaml'),
-  ];
+export const CPTC_BOC_FORM_CODE_LIVE_ACTION = '01F21' as const;
+export const CPTC_BOC_FORM_CODE_ANIMATION = '01F22' as const;
 
-  for (const candidate of candidates) {
+export type CptcBocFormCode =
+  | typeof CPTC_BOC_FORM_CODE_LIVE_ACTION
+  | typeof CPTC_BOC_FORM_CODE_ANIMATION;
+
+const REGISTRY_FILE_BY_FORM_CODE: Record<CptcBocFormCode, string> = {
+  [CPTC_BOC_FORM_CODE_LIVE_ACTION]: '01F21.live-action.yaml',
+  [CPTC_BOC_FORM_CODE_ANIMATION]: '01F22.animation.yaml',
+};
+
+function resolveRegistryCandidates(fileName: string, startDir: string = __dirname): string[] {
+  return [
+    path.join(startDir, '..', 'cptc', fileName),
+    path.join(startDir, '..', '..', 'cptc', fileName),
+  ];
+}
+
+export function getCptcBocRegistryPath(
+  formCode: CptcBocFormCode = CPTC_BOC_FORM_CODE_LIVE_ACTION,
+  startDir: string = __dirname,
+): string {
+  const fileName = REGISTRY_FILE_BY_FORM_CODE[formCode];
+  if (!fileName) {
+    throw new Error(`Unsupported CPTC BOC form code "${formCode}"`);
+  }
+
+  for (const candidate of resolveRegistryCandidates(fileName, startDir)) {
     if (fs.existsSync(candidate)) {
       return candidate;
     }
   }
 
-  throw new Error('CPTC 01F21 registry file not found (01F21.live-action.yaml)');
+  throw new Error(`CPTC BOC registry file not found for form ${formCode} (${fileName})`);
+}
+
+/** Default loader path — preserves live-action 01F21 behavior for existing generation. */
+export function getDefaultCptcBocRegistryPath(startDir: string = __dirname): string {
+  return getCptcBocRegistryPath(CPTC_BOC_FORM_CODE_LIVE_ACTION, startDir);
 }
