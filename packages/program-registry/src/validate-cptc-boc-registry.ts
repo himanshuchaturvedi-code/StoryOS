@@ -8,6 +8,7 @@ import type {
   BocRegistryValidationResult,
 } from '@storyos/types';
 import { accountMatchesAnyPattern, accountMatchesRule } from './pattern-match';
+import { budgetLineMatchesPolicyRule } from './resolve-policy-routing';
 import { parseTelefilmTemplateAccounts } from './telefilm-template-accounts';
 import { resolveFromMonorepoRoot } from './paths';
 
@@ -92,6 +93,38 @@ export function resolveAccountLineMappings(
   return mappings;
 }
 
+function resolvePolicyAccountMappings(
+  registry: BocFormRegistry,
+  templateId: string,
+  accounts: Array<{ code: string; name: string }>,
+): AccountLineMapping[] {
+  const mappings: AccountLineMapping[] = [];
+
+  for (const account of accounts) {
+    for (const policy of registry.policyNotes ?? []) {
+      for (const override of policy.overrides) {
+        if (
+          !budgetLineMatchesPolicyRule(account.code, account.name, null, override.match)
+        ) {
+          continue;
+        }
+
+        mappings.push({
+          accountCode: account.code,
+          lineCode:
+            policy.useInterimRouting !== false
+              ? override.interimLine
+              : override.officialLine,
+          templateId,
+          allowShared: false,
+        });
+      }
+    }
+  }
+
+  return mappings;
+}
+
 export function buildRegistryCoverageReport(
   registry: BocFormRegistry,
   templateId: string = registry.meta.templateVersion,
@@ -118,7 +151,10 @@ export function buildRegistryCoverageReport(
     (account) => !accountMatchesAnyPattern(account.code, template.coverageExcludePatterns),
   );
   const eligibleCodes = coverageEligibleAccounts.map((account) => account.code);
-  const mappings = resolveAccountLineMappings(registry, templateId, eligibleCodes);
+  const mappings = [
+    ...resolveAccountLineMappings(registry, templateId, eligibleCodes),
+    ...resolvePolicyAccountMappings(registry, templateId, coverageEligibleAccounts),
+  ];
 
   const mappedAccountSet = new Set(mappings.map((mapping) => mapping.accountCode));
   const unmappedAccountCodes = eligibleCodes.filter((code) => !mappedAccountSet.has(code));
@@ -495,6 +531,41 @@ export function validateCptcBocRegistry(
             error instanceof Error ? error.message : 'Coverage validation failed',
           ),
         );
+      }
+    }
+  }
+
+  const policyIds = new Set<string>();
+  for (const policy of registry.policyNotes ?? []) {
+    if (policyIds.has(policy.id)) {
+      errors.push(
+        issue('error', 'DUPLICATE_POLICY_ID', `Duplicate policy note id "${policy.id}"`, {
+          policyId: policy.id,
+        }),
+      );
+    }
+    policyIds.add(policy.id);
+
+    if (policy.overrides.length === 0) {
+      warnings.push(
+        issue('warning', 'EMPTY_POLICY_OVERRIDES', `Policy ${policy.id} has no overrides`, {
+          policyId: policy.id,
+        }),
+      );
+    }
+
+    for (const override of policy.overrides) {
+      for (const lineCode of [override.interimLine, override.officialLine]) {
+        if (!lineCodeSet.has(lineCode)) {
+          errors.push(
+            issue(
+              'error',
+              'UNKNOWN_POLICY_LINE',
+              `Policy ${policy.id} references unknown form line "${lineCode}"`,
+              { policyId: policy.id, lineCode },
+            ),
+          );
+        }
       }
     }
   }

@@ -5,6 +5,9 @@ import type {
   BocColumnKey,
   BocFormRegistry,
   BocLineSourceRule,
+  BocPolicyMatchRule,
+  BocPolicyNote,
+  BocPolicyRoutingOverride,
   BocSummaryFormulaType,
 } from '@storyos/types';
 import { getDefaultCptcBocRegistryPath } from './paths';
@@ -87,6 +90,79 @@ function parseAllowedColumns(raw: unknown, lineCode: string): BocColumnKey[] {
   }
 
   return raw as BocColumnKey[];
+}
+
+function parseStringArrayField(
+  value: unknown,
+  field: string,
+): string[] | undefined {
+  if (value == null) return undefined;
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
+    throw new Error(`${field} must be a string array`);
+  }
+  return value;
+}
+
+function parsePolicyMatchRule(raw: unknown, context: string): BocPolicyMatchRule {
+  if (raw == null || typeof raw !== 'object') {
+    throw new Error(`${context}.match must be an object`);
+  }
+  const match = raw as Record<string, unknown>;
+  return {
+    telefilmPatterns: parseStringArrayField(match.telefilmPatterns, `${context}.match.telefilmPatterns`),
+    telefilmAccounts: parseStringArrayField(match.telefilmAccounts, `${context}.match.telefilmAccounts`),
+    accountNamePatterns: parseStringArrayField(
+      match.accountNamePatterns,
+      `${context}.match.accountNamePatterns`,
+    ),
+    tags: parseStringArrayField(match.tags, `${context}.match.tags`),
+    excludeAccounts: parseStringArrayField(match.excludeAccounts, `${context}.match.excludeAccounts`),
+  };
+}
+
+function parsePolicyNotes(raw: unknown): BocPolicyNote[] | undefined {
+  if (raw == null) return undefined;
+  if (!Array.isArray(raw)) {
+    throw new Error('Registry policyNotes must be an array');
+  }
+
+  return raw.map((noteRaw, index) => {
+    if (noteRaw == null || typeof noteRaw !== 'object') {
+      throw new Error(`Registry policyNotes[${index}] must be an object`);
+    }
+    const note = noteRaw as Record<string, unknown>;
+    const id = assertString(note.id, `policyNotes[${index}].id`);
+    const description = assertString(note.description, `policyNotes[${index}].description`);
+
+    if (!Array.isArray(note.overrides)) {
+      throw new Error(`Policy ${id} overrides must be an array`);
+    }
+
+    const overrides: BocPolicyRoutingOverride[] = note.overrides.map((overrideRaw, overrideIndex) => {
+      if (overrideRaw == null || typeof overrideRaw !== 'object') {
+        throw new Error(`Policy ${id} overrides[${overrideIndex}] must be an object`);
+      }
+      const override = overrideRaw as Record<string, unknown>;
+      return {
+        match: parsePolicyMatchRule(override.match, `policyNotes[${index}].overrides[${overrideIndex}]`),
+        interimLine: assertString(
+          override.interimLine,
+          `policyNotes[${index}].overrides[${overrideIndex}].interimLine`,
+        ),
+        officialLine: assertString(
+          override.officialLine,
+          `policyNotes[${index}].overrides[${overrideIndex}].officialLine`,
+        ),
+      };
+    });
+
+    return {
+      id,
+      description,
+      useInterimRouting: note.useInterimRouting === false ? false : undefined,
+      overrides,
+    };
+  });
 }
 
 function parseRegistry(raw: unknown): BocFormRegistry {
@@ -215,6 +291,7 @@ function parseRegistry(raw: unknown): BocFormRegistry {
     lines,
     summaryLines,
     templates,
+    policyNotes: parsePolicyNotes(doc.policyNotes),
   };
 }
 

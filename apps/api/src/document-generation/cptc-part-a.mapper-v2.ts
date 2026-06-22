@@ -14,6 +14,7 @@ import {
   isLineCodeWithinRange,
   loadCptcBocRegistry,
   resolveFormLinesForAccount,
+  resolvePolicyFormLine,
   resolvePrimaryFormLineForAccount,
   resolveRollupKindForAccount,
 } from '@storyos/program-registry';
@@ -178,6 +179,28 @@ export function classifyForFormLine(
   return classifyLine(line, residencies);
 }
 
+function isProductionSummaryRow(
+  accountCode: string,
+  registry: BocFormRegistry,
+  rangeStart: string,
+  rangeEnd: string,
+): boolean {
+  if (isLineCodeWithinRange(accountCode, rangeStart, rangeEnd)) {
+    return true;
+  }
+
+  for (const policy of registry.policyNotes ?? []) {
+    if (policy.useInterimRouting === false) continue;
+    for (const override of policy.overrides) {
+      if (override.interimLine === accountCode) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /**
  * Maps collected budget data into official 01F21 form lines using the CPTC BOC registry.
  */
@@ -201,6 +224,10 @@ export function mapCptcPartAWithRegistry(
   let ambiguousMappingCount = 0;
   let columnConstraintCount = 0;
   let unclassifiedCount = 0;
+  let forceEmptyExcludedCount = 0;
+  let forceEmptyExcludedTotal = 0;
+  let policyInterimRoutingCount = 0;
+  let policyInterimRoutingTotal = 0;
 
   for (const line of data.lines) {
     const amount = Number(line.amount);
@@ -213,8 +240,19 @@ export function mapCptcPartAWithRegistry(
     }
 
     const accountCode = line.account.code;
+    const policyRouting = resolvePolicyFormLine(
+      registry,
+      accountCode,
+      line.account.name,
+      line.notes,
+    );
+    const registryPrimaryLine = resolvePrimaryFormLineForAccount(
+      registry,
+      templateId,
+      accountCode,
+    );
+    const primaryLine = policyRouting?.formLine ?? registryPrimaryLine;
     const matchingLines = resolveFormLinesForAccount(registry, templateId, accountCode);
-    const primaryLine = resolvePrimaryFormLineForAccount(registry, templateId, accountCode);
 
     if (!primaryLine) {
       unmappedCount++;
@@ -222,17 +260,36 @@ export function mapCptcPartAWithRegistry(
       continue;
     }
 
-    if (matchingLines.length > 1) {
+    if (matchingLines.length > 1 && !policyRouting) {
       ambiguousMappingCount++;
     }
 
     if (primaryLine.forceEmpty) {
+      forceEmptyExcludedCount++;
+      forceEmptyExcludedTotal += amount;
+      allocationTrace.push({
+        budgetLineId: line.id,
+        accountCode,
+        amount,
+        formLineCode: primaryLine.code,
+        rollupKind: 'excluded',
+      });
       warnings.push({
         fieldId: line.id,
         severity: 'warning',
-        message: `Budget account ${accountCode} maps to form line ${primaryLine.code} (${primaryLine.label}), which must remain empty on the official 01F21 form; amount excluded.`,
+        message: `Budget account ${accountCode} (${formatCurrency(amount)}) maps to form line ${primaryLine.code} (${primaryLine.label}), which must remain empty on the official 01F21 form; amount excluded from value columns.`,
       });
       continue;
+    }
+
+    if (policyRouting?.routingMode === 'interim') {
+      policyInterimRoutingCount++;
+      policyInterimRoutingTotal += amount;
+      warnings.push({
+        fieldId: line.id,
+        severity: 'info',
+        message: `Budget account ${accountCode} routed to interim form line ${primaryLine.code} per registry policy ${policyRouting.policyId} (official target ${policyRouting.officialFormLineCode} preserved for future form updates).`,
+      });
     }
 
     const split = resolveLineAmountSplit(line);
@@ -242,14 +299,21 @@ export function mapCptcPartAWithRegistry(
     const allowedColumns = primaryLine.allowedColumns;
     const rollupKind = resolveRollupKindForAccount(primaryLine, templateId, accountCode);
 
-    const recordTrace = (column: BocColumnKey, traceAmount: number) => {
+    const recordTrace = (
+      traceAmount: number,
+      column: BocColumnKey,
+      kind: BocAllocationTrace['rollupKind'] = rollupKind,
+    ) => {
       allocationTrace.push({
         budgetLineId: line.id,
         accountCode,
         amount: traceAmount,
         formLineCode: primaryLine.code,
         column,
-        rollupKind,
+        rollupKind: kind,
+        policyId: policyRouting?.policyId,
+        routingMode: policyRouting?.routingMode,
+        officialFormLineCode: policyRouting?.officialFormLineCode,
       });
     };
 
@@ -261,7 +325,11 @@ export function mapCptcPartAWithRegistry(
       );
       if (otherColumn) {
         addToColumn(bucket, otherColumn, split.otherCostsAmount);
-        recordTrace(otherColumn, split.otherCostsAmount);
+        recordTrace(
+          split.otherCostsAmount,
+          otherColumn,
+          policyRouting ? 'policyInterim' : rollupKind,
+        );
       } else {
         columnConstraintCount++;
       }
@@ -294,7 +362,11 @@ export function mapCptcPartAWithRegistry(
     }
 
     addToColumn(bucket, targetColumn, split.classifiableAmount);
-    recordTrace(targetColumn, split.classifiableAmount);
+    recordTrace(
+      split.classifiableAmount,
+      targetColumn,
+      policyRouting ? 'policyInterim' : rollupKind,
+    );
   }
 
   if (ineligibleExcludedCount > 0) {
@@ -329,6 +401,20 @@ export function mapCptcPartAWithRegistry(
     warnings.push({
       severity: 'warning',
       message: `${columnConstraintCount} budget line portion(s) could not be placed in an allowed column for their 01F21 form line and were omitted.`,
+    });
+  }
+
+  if (forceEmptyExcludedCount > 0) {
+    warnings.push({
+      severity: 'warning',
+      message: `${forceEmptyExcludedCount} budget line(s) mapped to forceEmpty 01F21 form lines (e.g. amortization/depreciation 10.1) were excluded from value columns (total ${formatCurrency(forceEmptyExcludedTotal)}).`,
+    });
+  }
+
+  if (policyInterimRoutingCount > 0) {
+    warnings.push({
+      severity: 'info',
+      message: `${policyInterimRoutingCount} budget line(s) used interim stock-footage routing per PN-2022-02 (total ${formatCurrency(policyInterimRoutingTotal)} on line 72.c; official target 9.11 preserved).`,
     });
   }
 
@@ -377,7 +463,7 @@ export function computeRegistrySummary(
   let postLabNonCanadian = 0;
 
   for (const row of dataRows) {
-    if (!isLineCodeWithinRange(row.accountCode, rangeStart, rangeEnd)) continue;
+    if (!isProductionSummaryRow(row.accountCode, registry, rangeStart, rangeEnd)) continue;
     totalCostOfProduction += row.total;
     keyCreativeCanadian += row.keyCreativeCanadian;
     keyCreativeNonCanadian += row.keyCreativeNonCanadian;

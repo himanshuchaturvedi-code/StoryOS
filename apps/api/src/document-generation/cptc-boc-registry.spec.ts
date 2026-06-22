@@ -233,4 +233,13 @@ summaryLines:
 
     expect(primary?.code).toBe('2.0.a');
   });
+
+  it('declares PN-2022-02 stock footage policy with interim and official targets', () => {
+    const policy = registry.policyNotes?.find((note) => note.id === 'PN-2022-02');
+    expect(policy).toBeDefined();
+    expect(policy?.useInterimRouting).not.toBe(false);
+    expect(policy?.overrides[0]?.interimLine).toBe('72.c');
+    expect(policy?.overrides[0]?.officialLine).toBe('9.11');
+    expect(findLineByCode(registry, '72.c')).toBeDefined();
+  });
 });

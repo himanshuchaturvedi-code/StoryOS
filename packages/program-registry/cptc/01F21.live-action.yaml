@@ -3,7 +3,7 @@ meta:
   formCode: "01F21"
   formLabel: Breakdown of Costs — Live Action
   formVersion: "2023-03-23"
-  registryVersion: "2026.06.2"
+  registryVersion: "2026.06.3"
   templateVersion: telefilm-doc-v1
 
 templates:
@@ -20,6 +20,19 @@ templates:
       - "58.*"
       - "59.*"
     unmappedAccountPolicy: WARN
+
+policyNotes:
+  - id: PN-2022-02
+    description: Stock footage may be reported as Other under 72 c until the official 01F21 form is updated.
+    useInterimRouting: true
+    overrides:
+      - match:
+          telefilmPatterns: ["67.*"]
+          accountNamePatterns: ["*stock*footage*"]
+          tags: ["stock_footage"]
+          excludeAccounts: ["67.01", "67.20", "67.90", "67.95"]
+        interimLine: "72.c"
+        officialLine: "9.11"
 
 lines:
   - code: "1.0"
@@ -973,7 +986,7 @@ lines:
         rollups: ["67.90"]
 
   - code: "9.11"
-    label: Stock footage
+    label: Stock footage (official form line — PN-2022-02 fallback target)
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -1013,6 +1026,13 @@ lines:
       - templateId: telefilm-doc-v1
         patterns: ["69.*"]
         allowShared: true
+
+  - code: "72.c"
+    label: Stock footage (interim — PN-2022-02, Other under 72 c)
+    parentCode: "10.4"
+    columnFamily: other
+    allowedColumns:
+      - otherCosts
 
   - code: "10.2"
     label: Unit publicity

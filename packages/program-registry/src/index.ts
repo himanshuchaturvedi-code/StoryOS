@@ -16,6 +16,11 @@ export {
   isLineCodeWithinRange,
   compareFormLineCodes,
 } from './resolve-form-line';
+export {
+  budgetLineMatchesPolicyRule,
+  resolvePolicyFormLine,
+  type PolicyRoutingResolution,
+} from './resolve-policy-routing';
 export { findMonorepoRoot, resolveFromMonorepoRoot, getDefaultCptcBocRegistryPath } from './paths';
 
 export const CPTC_BOC_REGISTRY_FORM_CODE = '01F21';

@@ -103,6 +103,7 @@ export interface BocFormRegistry {
   lines: BocFormLineDefinition[];
   summaryLines: BocSummaryLineDefinition[];
   templates: Record<string, BocTemplateDefinition>;
+  policyNotes?: BocPolicyNote[];
 }
 
 export interface BocRegistryValidationIssue {
@@ -139,7 +140,12 @@ export interface BocRegistryCoverageReport {
   unmappedAccountCodes: string[];
 }
 
-export type BocAllocationRollupKind = 'direct' | 'fringe' | 'travel';
+export type BocAllocationRollupKind =
+  | 'direct'
+  | 'fringe'
+  | 'travel'
+  | 'excluded'
+  | 'policyInterim';
 
 /** Internal audit trace for budget line → 01F21 placement (not rendered on PDF). */
 export interface BocAllocationTrace {
@@ -147,6 +153,40 @@ export interface BocAllocationTrace {
   accountCode: string;
   amount: number;
   formLineCode: string;
-  column: BocColumnKey;
+  column?: BocColumnKey;
   rollupKind: BocAllocationRollupKind;
+  /** Registry policy that rerouted this allocation (e.g. PN-2022-02). */
+  policyId?: string;
+  /** When policy routing is active, records interim vs official intent. */
+  routingMode?: 'interim' | 'official';
+  /** Official-form target preserved while interim routing is active. */
+  officialFormLineCode?: string;
+}
+
+export interface BocPolicyMatchRule {
+  /** Glob patterns for Telefilm account codes (e.g. "67.*"). */
+  telefilmPatterns?: string[];
+  /** Exact Telefilm account codes. */
+  telefilmAccounts?: string[];
+  /** Glob patterns matched against budget account names (case-insensitive). */
+  accountNamePatterns?: string[];
+  /** Budget line notes may contain these tag strings (case-insensitive). */
+  tags?: string[];
+  excludeAccounts?: string[];
+}
+
+export interface BocPolicyRoutingOverride {
+  match: BocPolicyMatchRule;
+  /** Interim 01F21 line while official form is unchanged (PN-2022-02 → 72.c). */
+  interimLine: string;
+  /** Official-form line preserved for future routing (e.g. 9.11). */
+  officialLine: string;
+}
+
+export interface BocPolicyNote {
+  id: string;
+  description: string;
+  /** When true (default), mapper routes via interimLine. */
+  useInterimRouting?: boolean;
+  overrides: BocPolicyRoutingOverride[];
 }
