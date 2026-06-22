@@ -60,6 +60,18 @@ function formatCurrency(amount: number): string {
   });
 }
 
+function resolveForceEmptyExampleLine(registry: BocFormRegistry): string {
+  const line =
+    registry.lines.find((entry) => entry.forceEmpty && /amort/i.test(entry.label)) ??
+    registry.lines.find((entry) => entry.forceEmpty);
+  return line?.code ?? 'forceEmpty line';
+}
+
+function resolveStockFootageOfficialLine(registry: BocFormRegistry): string {
+  const policy = registry.policyNotes?.find((note) => note.id === 'PN-2022-02');
+  return policy?.overrides[0]?.officialLine ?? 'official form line';
+}
+
 function placeAmountInAllowedColumn(
   column: ColumnKey | null,
   amount: number,
@@ -277,7 +289,7 @@ export function mapCptcPartAWithRegistry(
       warnings.push({
         fieldId: line.id,
         severity: 'warning',
-        message: `Budget account ${accountCode} (${formatCurrency(amount)}) maps to form line ${primaryLine.code} (${primaryLine.label}), which must remain empty on the official 01F21 form; amount excluded from value columns.`,
+        message: `Budget account ${accountCode} (${formatCurrency(amount)}) maps to form line ${primaryLine.code} (${primaryLine.label}), which must remain empty on the official ${registry.meta.formCode} form; amount excluded from value columns.`,
       });
       continue;
     }
@@ -407,14 +419,14 @@ export function mapCptcPartAWithRegistry(
   if (forceEmptyExcludedCount > 0) {
     warnings.push({
       severity: 'warning',
-      message: `${forceEmptyExcludedCount} budget line(s) mapped to forceEmpty 01F21 form lines (e.g. amortization/depreciation 10.1) were excluded from value columns (total ${formatCurrency(forceEmptyExcludedTotal)}).`,
+      message: `${forceEmptyExcludedCount} budget line(s) mapped to forceEmpty ${registry.meta.formCode} form lines (e.g. amortization/depreciation ${resolveForceEmptyExampleLine(registry)}) were excluded from value columns (total ${formatCurrency(forceEmptyExcludedTotal)}).`,
     });
   }
 
   if (policyInterimRoutingCount > 0) {
     warnings.push({
       severity: 'info',
-      message: `${policyInterimRoutingCount} budget line(s) used interim stock-footage routing per PN-2022-02 (total ${formatCurrency(policyInterimRoutingTotal)} on line 72.c; official target 9.11 preserved).`,
+      message: `${policyInterimRoutingCount} budget line(s) used interim stock-footage routing per PN-2022-02 (total ${formatCurrency(policyInterimRoutingTotal)} on line 72.c; official target ${resolveStockFootageOfficialLine(registry)} preserved).`,
     });
   }
 

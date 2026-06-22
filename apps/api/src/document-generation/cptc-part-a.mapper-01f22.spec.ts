@@ -197,3 +197,273 @@ describe('mapCptcPartAWithRegistry (01F22 animation — Slice 5D)', () => {
     expect(doc.rows.some((row) => row.accountCode === '55.90')).toBe(false);
   });
 });
+
+describe('mapCptcPartAWithRegistry (01F22 animation — Slice 5E policy handling)', () => {
+  const registry = loadCptcBocRegistryForForm(CPTC_BOC_FORM_CODE_ANIMATION);
+
+  it('routes stock footage to interim line 72.c per PN-2022-02 with trace metadata', () => {
+    const stockFootage = buildAnimationBudgetLine({
+      amount: 3500,
+      account: {
+        code: '67.10',
+        name: 'Stock Footage Purchases',
+        sortOrder: 1,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([stockFootage]),
+      registry,
+    );
+
+    expect(doc.formCode).toBe('01F22');
+    expect(doc.rows.find((row) => row.accountCode === '72.c')).toMatchObject({
+      otherCosts: 3500,
+      servicesCanadian: 0,
+    });
+    expect(doc.rows.find((row) => row.accountCode === '8.11')?.total).toBe(0);
+    expect(doc.allocationTrace?.[0]).toMatchObject({
+      accountCode: '67.10',
+      formLineCode: '72.c',
+      column: 'otherCosts',
+      rollupKind: 'policyInterim',
+      policyId: 'PN-2022-02',
+      routingMode: 'interim',
+      officialFormLineCode: '8.11',
+    });
+    expect(
+      doc.warnings.some((warning) =>
+        warning.message.includes('interim form line 72.c per registry policy PN-2022-02'),
+      ),
+    ).toBe(true);
+    expect(
+      doc.warnings.some((warning) => warning.message.includes('official target 8.11')),
+    ).toBe(true);
+  });
+
+  it('matches stock footage policy via notes tag when account name is generic', () => {
+    const taggedStock = buildAnimationBudgetLine({
+      amount: 900,
+      notes: 'stock_footage',
+      account: {
+        code: '67.12',
+        name: 'Licensed clips',
+        sortOrder: 1,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([taggedStock]),
+      registry,
+    );
+
+    expect(doc.rows.find((row) => row.accountCode === '72.c')?.otherCosts).toBe(900);
+  });
+
+  it('excludes amortization/depreciation from 9.1 value columns with warnings and trace', () => {
+    const amortization = buildAnimationBudgetLine({
+      amount: 5000,
+      account: {
+        code: '69.01',
+        name: 'Amortization',
+        sortOrder: 1,
+      },
+      location: { country: 'CA' },
+    });
+    const eligible = buildAnimationBudgetLine({
+      amount: 1000,
+      budgetAccountId: 'acct-eligible',
+      account: {
+        id: 'acct-eligible',
+        code: '71.01',
+        name: 'Insurance',
+        sortOrder: 2,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([amortization, eligible]),
+      registry,
+    );
+
+    const amortRow = doc.rows.find((row) => row.accountCode === '9.1');
+    expect(amortRow?.total).toBe(0);
+    expect(amortRow?.servicesCanadian).toBe(0);
+    expect(amortRow?.otherCosts).toBe(0);
+    expect(doc.allocationTrace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountCode: '69.01',
+          formLineCode: '9.1',
+          amount: 5000,
+          rollupKind: 'excluded',
+        }),
+      ]),
+    );
+    expect(
+      doc.warnings.some((warning) =>
+        warning.message.includes('forceEmpty 01F22 form lines (e.g. amortization/depreciation 9.1)'),
+      ),
+    ).toBe(true);
+    expect(doc.summary.totalCostOfProduction).toBe(1000);
+  });
+
+  it('includes interim stock footage in production total while excluding forceEmpty lines', () => {
+    const stockFootage = buildAnimationBudgetLine({
+      amount: 2000,
+      account: { code: '67.10', name: 'Stock Footage', sortOrder: 1 },
+      location: { country: 'CA' },
+    });
+    const amortization = buildAnimationBudgetLine({
+      amount: 800,
+      budgetAccountId: 'acct-amort',
+      account: { id: 'acct-amort', code: '69.01', name: 'Amortization', sortOrder: 2 },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([stockFootage, amortization]),
+      registry,
+    );
+
+    expect(doc.summary.totalCostOfProduction).toBe(2000);
+  });
+});
+
+describe('mapCptcPartAWithRegistry (01F22 animation — Slice 5E policy handling)', () => {
+  const registry = loadCptcBocRegistryForForm(CPTC_BOC_FORM_CODE_ANIMATION);
+
+  it('routes stock footage to interim line 72.c per PN-2022-02 with trace metadata', () => {
+    const stockFootage = buildAnimationBudgetLine({
+      amount: 3500,
+      account: {
+        code: '67.10',
+        name: 'Stock Footage Purchases',
+        sortOrder: 1,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([stockFootage]),
+      registry,
+    );
+
+    expect(doc.formCode).toBe('01F22');
+    expect(doc.rows.find((row) => row.accountCode === '72.c')).toMatchObject({
+      otherCosts: 3500,
+      servicesCanadian: 0,
+    });
+    expect(doc.rows.find((row) => row.accountCode === '8.11')?.total).toBe(0);
+    expect(doc.allocationTrace?.[0]).toMatchObject({
+      accountCode: '67.10',
+      formLineCode: '72.c',
+      column: 'otherCosts',
+      rollupKind: 'policyInterim',
+      policyId: 'PN-2022-02',
+      routingMode: 'interim',
+      officialFormLineCode: '8.11',
+    });
+    expect(
+      doc.warnings.some((warning) =>
+        warning.message.includes('interim form line 72.c per registry policy PN-2022-02'),
+      ),
+    ).toBe(true);
+    expect(
+      doc.warnings.some((warning) => warning.message.includes('official target 8.11')),
+    ).toBe(true);
+  });
+
+  it('matches stock footage policy via notes tag when account name is generic', () => {
+    const taggedStock = buildAnimationBudgetLine({
+      amount: 900,
+      notes: 'stock_footage',
+      account: {
+        code: '67.12',
+        name: 'Licensed clips',
+        sortOrder: 1,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([taggedStock]),
+      registry,
+    );
+
+    expect(doc.rows.find((row) => row.accountCode === '72.c')?.otherCosts).toBe(900);
+  });
+
+  it('excludes amortization/depreciation from 9.1 value columns with warnings and trace', () => {
+    const amortization = buildAnimationBudgetLine({
+      amount: 5000,
+      account: {
+        code: '69.01',
+        name: 'Amortization',
+        sortOrder: 1,
+      },
+      location: { country: 'CA' },
+    });
+    const eligible = buildAnimationBudgetLine({
+      amount: 1000,
+      budgetAccountId: 'acct-eligible',
+      account: {
+        id: 'acct-eligible',
+        code: '71.01',
+        name: 'Insurance',
+        sortOrder: 2,
+      },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([amortization, eligible]),
+      registry,
+    );
+
+    const amortRow = doc.rows.find((row) => row.accountCode === '9.1');
+    expect(amortRow?.total).toBe(0);
+    expect(amortRow?.servicesCanadian).toBe(0);
+    expect(amortRow?.otherCosts).toBe(0);
+    expect(doc.allocationTrace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountCode: '69.01',
+          formLineCode: '9.1',
+          amount: 5000,
+          rollupKind: 'excluded',
+        }),
+      ]),
+    );
+    expect(
+      doc.warnings.some((warning) =>
+        warning.message.includes('forceEmpty 01F22 form lines (e.g. amortization/depreciation 9.1)'),
+      ),
+    ).toBe(true);
+    expect(doc.summary.totalCostOfProduction).toBe(1000);
+  });
+
+  it('includes interim stock footage in production total while excluding forceEmpty lines', () => {
+    const stockFootage = buildAnimationBudgetLine({
+      amount: 2000,
+      account: { code: '67.10', name: 'Stock Footage', sortOrder: 1 },
+      location: { country: 'CA' },
+    });
+    const amortization = buildAnimationBudgetLine({
+      amount: 800,
+      budgetAccountId: 'acct-amort',
+      account: { id: 'acct-amort', code: '69.01', name: 'Amortization', sortOrder: 2 },
+      location: { country: 'CA' },
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildAnimationCptcPartAData([stockFootage, amortization]),
+      registry,
+    );
+
+    expect(doc.summary.totalCostOfProduction).toBe(2000);
+  });
+});
