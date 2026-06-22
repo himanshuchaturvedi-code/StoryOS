@@ -93,6 +93,7 @@ export function buildCptcPartAData(
 ) {
   return {
     project: { id: 'project-1', title: 'Test Production' },
+    projectFormat: null,
     budgetVersionId: 'version-1',
     budgetVersionName: 'Locked v1',
     lines,

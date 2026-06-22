@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@storyos/database';
 import { BudgetVersionStatus } from '@storyos/types';
+import type { FormatType } from '@storyos/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { TenantContext } from '../tenant/tenant.context';
@@ -19,11 +20,14 @@ export type BudgetLineWithRelations = Prisma.BudgetLineGetPayload<{
   };
 }>;
 
+import type { ProjectFormatSnapshot } from './cptc-boc-form-selection';
+
 export interface CptcPartAData {
   project: {
     id: string;
     title: string;
   };
+  projectFormat: ProjectFormatSnapshot | null;
   budgetVersionId: string;
   budgetVersionName: string;
   lines: BudgetLineWithRelations[];
@@ -42,6 +46,29 @@ export class CptcPartACollector extends TenantAwareService {
       select: { id: true, title: true },
     });
     if (!project) throw new NotFoundException('Project not found');
+
+    const projectFormatRow = await this.prisma.projectFormat.findFirst({
+      where: {
+        organizationId: this.organizationId,
+        projectId,
+        deletedAt: null,
+      },
+      select: {
+        formatType: true,
+        isLiveAction: true,
+        hasAnimation: true,
+        animationPercentage: true,
+      },
+    });
+
+    const projectFormat: ProjectFormatSnapshot | null = projectFormatRow
+      ? {
+          formatType: projectFormatRow.formatType as FormatType,
+          isLiveAction: projectFormatRow.isLiveAction,
+          hasAnimation: projectFormatRow.hasAnimation,
+          animationPercentage: projectFormatRow.animationPercentage,
+        }
+      : null;
 
     const resolvedVersionId =
       budgetVersionId ?? (await this.resolveLockedBudgetVersionId(projectId));
@@ -106,6 +133,7 @@ export class CptcPartACollector extends TenantAwareService {
 
     return {
       project: { id: project.id, title: project.title },
+      projectFormat,
       budgetVersionId: resolvedVersionId,
       budgetVersionName: version.name,
       lines,

@@ -437,6 +437,9 @@ export function mapCptcPartAWithRegistry(
     projectTitle: data.project.title,
     budgetVersionId: data.budgetVersionId,
     budgetVersionName: data.budgetVersionName,
+    formCode: registry.meta.formCode,
+    formLabel: registry.meta.formLabel,
+    summaryLineDefinitions: registry.summaryLines,
     rows,
     summary,
     warnings,
@@ -452,7 +455,9 @@ export function computeRegistrySummary(
 ): BocSummary {
   const dataRows = rows.filter((row) => !row.isHeader);
 
-  const sumLineRange = registry.summaryLines.find((line) => line.code === '11.0');
+  const sumLineRange = registry.summaryLines.find(
+    (line) => line.formula === 'SUM_LINE_TOTALS',
+  );
   const rangeStart = sumLineRange?.sourceLineRange?.[0] ?? '1.0';
   const rangeEnd = sumLineRange?.sourceLineRange?.[1] ?? '10.5';
 

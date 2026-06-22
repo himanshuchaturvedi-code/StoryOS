@@ -1,5 +1,10 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import type { CptcPartADocument, BocRow, BocSummary } from '@storyos/types';
+import type {
+  BocSummary,
+  BocSummaryLineDefinition,
+  CptcPartADocument,
+  BocRow,
+} from '@storyos/types';
 
 const PAGE_WIDTH = 842; // A4 landscape
 const PAGE_HEIGHT = 595;
@@ -48,6 +53,81 @@ function pct(n: number): string {
   return (n * 100).toFixed(1) + '%';
 }
 
+function summaryRowValues(
+  definition: BocSummaryLineDefinition,
+  summary: BocSummary,
+): string[] {
+  switch (definition.formula) {
+    case 'SUM_LINE_TOTALS':
+      return [
+        definition.code,
+        definition.label.toUpperCase(),
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        fmt(summary.totalCostOfProduction),
+      ];
+    case 'SUM_KEY_CREATIVE_COLUMNS':
+      return [
+        definition.code,
+        definition.label.toUpperCase(),
+        fmt(summary.totalServicesCanadian),
+        fmt(summary.totalServicesNonCanadian),
+        '',
+        '',
+        '',
+        '',
+        '',
+        fmt(summary.totalServices),
+      ];
+    case 'RATIO_KEY_CREATIVE_CANADIAN':
+      return [
+        definition.code,
+        definition.label.toUpperCase(),
+        pct(summary.servicesCanadianRatio),
+        pct(1 - summary.servicesCanadianRatio),
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ];
+    case 'SUM_POST_LAB_COLUMNS':
+      return [
+        definition.code,
+        definition.label.toUpperCase(),
+        '',
+        '',
+        '',
+        '',
+        fmt(summary.totalPostLabCanadian),
+        fmt(summary.totalPostLabNonCanadian),
+        '',
+        fmt(summary.totalPostLab),
+      ];
+    case 'RATIO_POST_LAB_CANADIAN':
+      return [
+        definition.code,
+        definition.label.toUpperCase(),
+        '',
+        '',
+        '',
+        '',
+        pct(summary.postLabCanadianRatio),
+        pct(1 - summary.postLabCanadianRatio),
+        '',
+        '',
+      ];
+    default:
+      return [definition.code, definition.label, '', '', '', '', '', '', '', ''];
+  }
+}
+
 function rowValues(row: BocRow): string[] {
   return [
     row.accountCode,
@@ -81,7 +161,7 @@ export async function renderCptcPartAPdf(
   let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
 
-  page.drawText('BREAKDOWN OF COSTS — LIVE ACTION', {
+  page.drawText(doc.formLabel.toUpperCase(), {
     x: startX,
     y,
     size: TITLE_FONT_SIZE,
@@ -203,32 +283,45 @@ export async function renderCptcPartAPdf(
 
   y -= 6;
   const s: BocSummary = doc.summary;
+  const summaryDefinitions =
+    doc.summaryLineDefinitions.length > 0
+      ? doc.summaryLineDefinitions
+      : [
+          {
+            code: '11.0',
+            label: 'Total cost of production',
+            formula: 'SUM_LINE_TOTALS' as const,
+          },
+          {
+            code: '11.1',
+            label: 'Total services (Key Creative Canadian + Non-Canadian)',
+            formula: 'SUM_KEY_CREATIVE_COLUMNS' as const,
+          },
+          {
+            code: '11.2',
+            label: 'Ratio % (Canadian to non-Canadian of Total Services)',
+            formula: 'RATIO_KEY_CREATIVE_CANADIAN' as const,
+          },
+          {
+            code: '11.3',
+            label: 'Total post-production / laboratory',
+            formula: 'SUM_POST_LAB_COLUMNS' as const,
+          },
+          {
+            code: '11.4',
+            label: 'Ratio % (Canadian to non-Canadian of Total Post/Lab)',
+            formula: 'RATIO_POST_LAB_CANADIAN' as const,
+          },
+        ];
 
-  drawRow(
-    ['11.0', 'TOTAL COST OF PRODUCTION', '', '', '', '', '', '', '', fmt(s.totalCostOfProduction)],
-    true,
-    headerBg,
-  );
-  drawRow(
-    ['11.1', 'TOTAL SERVICES', fmt(s.totalServicesCanadian), fmt(s.totalServicesNonCanadian), '', '', '', '', '', fmt(s.totalServices)],
-    false,
-    undefined,
-  );
-  drawRow(
-    ['11.2', 'RATIO % (Can. to non-Can.)', pct(s.servicesCanadianRatio), pct(1 - s.servicesCanadianRatio), '', '', '', '', '', ''],
-    false,
-    undefined,
-  );
-  drawRow(
-    ['11.3', 'TOTAL POST-PRODUCTION / LAB', '', '', '', '', fmt(s.totalPostLabCanadian), fmt(s.totalPostLabNonCanadian), '', fmt(s.totalPostLab)],
-    false,
-    undefined,
-  );
-  drawRow(
-    ['11.4', 'RATIO % (Can. to non-Can.)', '', '', '', '', pct(s.postLabCanadianRatio), pct(1 - s.postLabCanadianRatio), '', ''],
-    false,
-    undefined,
-  );
+  for (let i = 0; i < summaryDefinitions.length; i++) {
+    const definition = summaryDefinitions[i]!;
+    drawRow(
+      summaryRowValues(definition, s),
+      i === 0,
+      i === 0 ? headerBg : undefined,
+    );
+  }
 
   if (doc.warnings.length > 0) {
     y -= 16;

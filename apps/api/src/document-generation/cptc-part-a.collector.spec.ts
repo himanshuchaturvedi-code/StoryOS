@@ -22,6 +22,9 @@ describe('CptcPartACollector locked budget enforcement', () => {
       project: {
         findFirst: jest.fn().mockResolvedValue({ id: projectId, title: 'VOR' }),
       },
+      projectFormat: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       budget: {
         findFirst: jest.fn().mockResolvedValue({ id: 'budget-1' }),
       },
@@ -40,6 +43,9 @@ describe('CptcPartACollector locked budget enforcement', () => {
     const prisma = {
       project: {
         findFirst: jest.fn().mockResolvedValue({ id: projectId, title: 'VOR' }),
+      },
+      projectFormat: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       budgetVersion: {
         findFirst: jest.fn().mockResolvedValue({
@@ -64,6 +70,9 @@ describe('CptcPartACollector locked budget enforcement', () => {
     const prisma = {
       project: {
         findFirst: jest.fn().mockResolvedValue({ id: projectId, title: 'VOR' }),
+      },
+      projectFormat: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       budget: {
         findFirst: jest.fn().mockResolvedValue({ id: 'budget-1' }),

@@ -3,7 +3,7 @@
  * Will evolve as more document types are added.
  */
 
-import type { BocAllocationTrace } from './boc-registry';
+import type { BocAllocationTrace, BocSummaryLineDefinition } from './boc-registry';
 
 export * from './boc-registry';
 
@@ -47,6 +47,12 @@ export interface CptcPartADocument {
   projectTitle: string;
   budgetVersionId: string;
   budgetVersionName: string;
+  /** CPTC form code (01F21 live action or 01F22 animation). */
+  formCode: string;
+  /** Human-readable form title from registry meta.formLabel. */
+  formLabel: string;
+  /** Registry summary row definitions used for PDF rendering. */
+  summaryLineDefinitions: BocSummaryLineDefinition[];
   rows: BocRow[];
   summary: BocSummary;
   warnings: DocumentWarning[];

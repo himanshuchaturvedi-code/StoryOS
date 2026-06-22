@@ -21,6 +21,9 @@ jest.mock('./cptc-part-a.mapper-v2', () => ({
     projectTitle: 'Test Production',
     budgetVersionId: 'version-1',
     budgetVersionName: 'Locked v1',
+    formCode: '01F21',
+    formLabel: 'Breakdown of Costs — Live Action',
+    summaryLineDefinitions: [],
     rows: [],
     summary: {
       totalCostOfProduction: 0,
@@ -75,6 +78,7 @@ describe('DocumentGenerationService Slice 2', () => {
     collector = {
       collect: jest.fn(async () => ({
         project: { id: projectId, title: 'Test Production' },
+        projectFormat: null,
         budgetVersionId: 'version-1',
         budgetVersionName: 'Locked v1',
         lines: [],

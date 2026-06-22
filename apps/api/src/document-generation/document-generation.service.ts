@@ -5,7 +5,9 @@ import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { TenantContext } from '../tenant/tenant.context';
 import { StorageService } from '../documents/storage.service';
 import { assertValidProgramDocumentTag } from '../documents/program-document-tag.validation';
+import { loadCptcBocRegistryForForm } from '@storyos/program-registry';
 import { CptcPartACollector } from './cptc-part-a.collector';
+import { resolveCptcBocFormSelection } from './cptc-boc-form-selection';
 import { mapCptcPartAWithRegistry } from './cptc-part-a.mapper-v2';
 import { renderCptcPartAPdf } from './pdf.renderer';
 
@@ -37,7 +39,10 @@ export class DocumentGenerationService extends TenantAwareService {
   ): Promise<GenerateDocumentResult> {
     const data = await this.collector.collect(projectId, budgetVersionId);
 
-    const mapped = mapCptcPartAWithRegistry(data);
+    const formSelection = resolveCptcBocFormSelection(data.projectFormat, data.lines);
+    const registry = loadCptcBocRegistryForForm(formSelection.formCode);
+    const mapped = mapCptcPartAWithRegistry(data, registry);
+    mapped.warnings.unshift(...formSelection.warnings);
 
     const pdfBuffer = await renderCptcPartAPdf(mapped);
 
