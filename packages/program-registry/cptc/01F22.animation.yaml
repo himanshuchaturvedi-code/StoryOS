@@ -3,7 +3,7 @@ meta:
   formCode: "01F22"
   formLabel: Breakdown of Costs — Animation
   formVersion: "2023-03-23"
-  registryVersion: "2026.06.1"
+  registryVersion: "2026.06.2"
   templateVersion: telefilm-doc-v1
 
 templates:
@@ -347,8 +347,7 @@ lines:
     allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
     sources:
       - templateId: telefilm-doc-v1
-        accounts: ["06.60", "06.65", "10.60", "10.65"]
-        allowShared: true
+        accounts: ["06.60", "06.65"]
 
   - code: "6.2"
     label: 2nd lead voice/performer
@@ -370,10 +369,6 @@ lines:
     label: 2nd lead voice — Travel & living expenses
     columnFamily: keyCreative
     allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
-    sources:
-      - templateId: telefilm-doc-v1
-        accounts: ["10.60", "10.65"]
-        allowShared: true
 
   - code: "6.3"
     label: Other voices (or performers)
@@ -381,7 +376,14 @@ lines:
     sources:
       - templateId: telefilm-doc-v1
         patterns: ["06.*", "10.*", "11.*"]
-        excludeAccounts: ["06.01", "06.60", "06.65", "06.90", "10.20", "10.25", "10.60", "10.65", "10.70", "10.75", "10.76", "10.90"]
+        excludeAccounts:
+          - "06.01"
+          - "06.60"
+          - "06.65"
+          - "06.90"
+          - "10.20"
+          - "10.25"
+          - "10.90"
 
   - code: "7.0"
     label: Production labour
@@ -450,39 +452,132 @@ lines:
 
   - code: "7.3"
     label: Production labour
-    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.3.a"
+    parentCode: "7.3"
+    label: Production unit — Remuneration & fringe benefits
+    columnFamily: lineProducerRemuneration
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian, servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["53.01", "53.02"]
+        rollups: ["53.90"]
+
+  - code: "7.3.b"
+    parentCode: "7.3"
+    label: Other production unit labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
     sources:
       - templateId: telefilm-doc-v1
         patterns: ["53.*"]
+        excludeAccounts: ["53.01", "53.02", "53.90"]
 
   - code: "7.4"
     label: Voice edit labour
-    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.4.a"
+    parentCode: "7.4"
+    label: Voice director — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["52.05"]
+        rollups: ["52.90"]
+
+  - code: "7.4.b"
+    parentCode: "7.4"
+    label: Other voice recording/edit labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
     sources:
       - templateId: telefilm-doc-v1
         patterns: ["52.*"]
+        excludeAccounts: ["52.05", "52.90"]
 
   - code: "7.5"
     label: Key animation labour
-    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.5.a"
+    parentCode: "7.5"
+    label: Key animation — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["55.10", "55.20", "55.25"]
+        rollups: ["55.90"]
+
+  - code: "7.5.b"
+    parentCode: "7.5"
+    label: Other key animation labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
     sources:
       - templateId: telefilm-doc-v1
         patterns: ["55.*"]
+        excludeAccounts:
+          - "55.10"
+          - "55.20"
+          - "55.25"
+          - "55.50"
+          - "55.54"
+          - "55.55"
+          - "55.67"
+          - "55.68"
+          - "55.80"
+          - "55.90"
 
   - code: "7.6"
     label: Layout & background labour
-    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.6.a"
+    parentCode: "7.6"
+    label: Layout & background — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["56.01", "56.50", "56.60"]
+        rollups: ["56.90"]
+
+  - code: "7.6.b"
+    parentCode: "7.6"
+    label: Other layout & background labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
     sources:
       - templateId: telefilm-doc-v1
         patterns: ["56.*"]
+        excludeAccounts:
+          - "56.01"
+          - "56.50"
+          - "56.60"
+          - "56.79"
+          - "56.90"
 
   - code: "7.7"
     label: Ass. animation/in-betweening labour
     allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["55.50", "55.54", "55.80"]
 
   - code: "7.8"
     label: Animation check, colour check and final check labour
     allowedColumns: [servicesCanadian, servicesNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["55.55", "55.67", "55.68", "56.79"]
 
   - code: "7.9"
     label: Photocopy labour
@@ -524,11 +619,29 @@ lines:
     allowedColumns: [servicesCanadian, servicesNonCanadian]
 
   - code: "7.14"
-    label: Other production labour
-    allowedColumns: [servicesCanadian, servicesNonCanadian]
+    label: MOCAP/live animation labour
+    isHeader: true
+    parentCode: "7.0"
+    allowedColumns: []
+
+  - code: "7.14.a"
+    parentCode: "7.14"
+    label: MOCAP/live animation — Remuneration & fringe benefits
+    columnFamily: keyCreative
+    allowedColumns: [keyCreativeCanadian, keyCreativeNonCanadian]
+    sources:
+      - templateId: telefilm-doc-v1
+        accounts: ["57.05", "57.15"]
+        rollups: ["57.90"]
+
+  - code: "7.14.b"
+    parentCode: "7.14"
+    label: Other MOCAP/live animation labour
+    allowedColumns: [servicesCanadian, servicesNonCanadian, otherCosts]
     sources:
       - templateId: telefilm-doc-v1
         patterns: ["57.*"]
+        excludeAccounts: ["57.05", "57.15", "57.90"]
 
   - code: "7.15"
     label: Equipment

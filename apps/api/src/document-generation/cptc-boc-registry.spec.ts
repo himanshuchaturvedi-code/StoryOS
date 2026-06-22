@@ -283,16 +283,16 @@ describe('CPTC 01F22 BOC registry (Slice 5B)', () => {
   });
 
   it('includes representative Telefilm animation section mappings', () => {
-    const voiceRecording = findLineByCode(registry, '7.4');
-    const productionUnit = findLineByCode(registry, '7.3');
+    const voiceDirector = findLineByCode(registry, '7.4.a');
+    const productionUnit = findLineByCode(registry, '7.3.a');
     const artDesign = findLineByCode(registry, '7.1.c');
-    const twoDAnimation = findLineByCode(registry, '7.5');
-    const threeDAnimation = findLineByCode(registry, '7.6');
-    const mocap = findLineByCode(registry, '7.14');
-    const animationFringe = findLineByCode(registry, '7.15');
+    const twoDAnimation = findLineByCode(registry, '7.5.a');
+    const threeDAnimation = findLineByCode(registry, '7.6.a');
+    const mocap = findLineByCode(registry, '7.14.b');
+    const animationEquipment = findLineByCode(registry, '7.15');
     const materials = findLineByCode(registry, '7.21');
 
-    expect(lineMapsAccount(voiceRecording!, '52.05', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+    expect(lineMapsAccount(voiceDirector!, '52.05', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
       true,
     );
     expect(lineMapsAccount(productionUnit!, '53.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
@@ -306,10 +306,25 @@ describe('CPTC 01F22 BOC registry (Slice 5B)', () => {
       true,
     );
     expect(lineMapsAccount(mocap!, '57.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(true);
-    expect(lineMapsAccount(animationFringe!, '58.95', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
+    expect(lineMapsAccount(animationEquipment!, '58.95', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(
       true,
     );
     expect(lineMapsAccount(materials!, '59.01', CPTC_BOC_REGISTRY_TEMPLATE_ID)).toBe(true);
+  });
+
+  it('rolls animation section fringes into remuneration sub-lines', () => {
+    expect(
+      resolvePrimaryFormLineForAccount(registry, CPTC_BOC_REGISTRY_TEMPLATE_ID, '52.90')?.code,
+    ).toBe('7.4.a');
+    expect(
+      resolvePrimaryFormLineForAccount(registry, CPTC_BOC_REGISTRY_TEMPLATE_ID, '53.90')?.code,
+    ).toBe('7.3.a');
+    expect(
+      resolvePrimaryFormLineForAccount(registry, CPTC_BOC_REGISTRY_TEMPLATE_ID, '55.90')?.code,
+    ).toBe('7.5.a');
+    expect(
+      resolvePrimaryFormLineForAccount(registry, CPTC_BOC_REGISTRY_TEMPLATE_ID, '57.90')?.code,
+    ).toBe('7.14.a');
   });
 
   it('declares PN-2022-02 stock footage policy with interim 72.c and official 8.11', () => {
