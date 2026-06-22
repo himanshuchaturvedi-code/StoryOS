@@ -18,7 +18,8 @@ export interface BocRow {
   keyCreativeNonCanadian: number;
   servicesCanadian: number;
   servicesNonCanadian: number;
-  postProductionLab: number;
+  postProductionLabCanadian: number;
+  postProductionLabNonCanadian: number;
   otherCosts: number;
   total: number;
   isHeader: boolean;

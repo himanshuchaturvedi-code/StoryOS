@@ -1,3 +1,4 @@
+import { ExpenseType } from '@storyos/types';
 import type {
   BocRow,
   BocSummary,
@@ -11,14 +12,15 @@ import type {
 
 /**
  * BOC column classification for a single budget line.
- * Determines which of the 6 value columns a line's amount falls into.
+ * Determines which value column a line's classifiable amount falls into.
  */
-type ColumnKey =
+export type ColumnKey =
   | 'keyCreativeCanadian'
   | 'keyCreativeNonCanadian'
   | 'servicesCanadian'
   | 'servicesNonCanadian'
-  | 'postProductionLab'
+  | 'postProductionLabCanadian'
+  | 'postProductionLabNonCanadian'
   | 'otherCosts';
 
 const CPTC_ROLES = new Set([
@@ -31,6 +33,14 @@ const CPTC_ROLES = new Set([
   'MUSIC_COMPOSER',
   'PICTURE_EDITOR',
 ]);
+
+export interface LineAmountSplit {
+  /** Amount routed through residency / role classification. */
+  classifiableAmount: number;
+  /** Non-labour remainder (MIXED lines) placed directly in Other Costs. */
+  otherCostsAmount: number;
+  warnings: DocumentWarning[];
+}
 
 /**
  * Pure function: maps collected StoryOS data into a CPTC Part A
@@ -52,47 +62,60 @@ export function mapCptcPartA(data: CptcPartAData): CptcPartADocument {
   >();
 
   let unclassifiedCount = 0;
+  let ineligibleExcludedCount = 0;
+  let ineligibleExcludedTotal = 0;
 
   for (const line of data.lines) {
     const amount = Number(line.amount);
     if (amount === 0) continue;
 
+    if (line.taxCreditIneligible) {
+      ineligibleExcludedCount++;
+      ineligibleExcludedTotal += amount;
+      continue;
+    }
+
+    const split = resolveLineAmountSplit(line);
+    warnings.push(...split.warnings);
+
     const acct = line.account;
     const key = acct.id;
 
     if (!accountBuckets.has(key)) {
-      accountBuckets.set(key, {
-        accountCode: acct.code,
-        accountName: acct.name,
-        isHeader: acct.isHeader,
-        parentId: acct.parentId,
-        sortOrder: acct.sortOrder,
-        columns: {
-          keyCreativeCanadian: 0,
-          keyCreativeNonCanadian: 0,
-          servicesCanadian: 0,
-          servicesNonCanadian: 0,
-          postProductionLab: 0,
-          otherCosts: 0,
-        },
-      });
+      accountBuckets.set(key, emptyAccountBucket(acct));
     }
 
     const bucket = accountBuckets.get(key)!;
+
+    if (split.otherCostsAmount > 0) {
+      bucket.columns.otherCosts += split.otherCostsAmount;
+    }
+
+    if (split.classifiableAmount === 0) {
+      continue;
+    }
+
     const col = classifyLine(line, data.residencies);
 
     if (!col) {
       unclassifiedCount++;
-      bucket.columns.otherCosts += amount;
+      bucket.columns.otherCosts += split.classifiableAmount;
     } else {
-      bucket.columns[col] += amount;
+      bucket.columns[col] += split.classifiableAmount;
     }
+  }
+
+  if (ineligibleExcludedCount > 0) {
+    warnings.push({
+      severity: 'warning',
+      message: `${ineligibleExcludedCount} budget line(s) marked tax-credit ineligible were excluded from the Breakdown of Costs (total ${formatCurrency(ineligibleExcludedTotal)}).`,
+    });
   }
 
   if (unclassifiedCount > 0) {
     warnings.push({
       severity: 'warning',
-      message: `${unclassifiedCount} budget line(s) could not be fully classified (missing person/vendor or residency data). Amounts placed in "Other Costs".`,
+      message: `${unclassifiedCount} budget line(s) could not be fully classified (missing person/vendor or residency data). Classifiable amounts placed in "Other Costs".`,
     });
   }
 
@@ -106,13 +129,7 @@ export function mapCptcPartA(data: CptcPartAData): CptcPartADocument {
     isHeader: b.isHeader,
     indent: b.parentId ? 1 : 0,
     ...b.columns,
-    total:
-      b.columns.keyCreativeCanadian +
-      b.columns.keyCreativeNonCanadian +
-      b.columns.servicesCanadian +
-      b.columns.servicesNonCanadian +
-      b.columns.postProductionLab +
-      b.columns.otherCosts,
+    total: sumRowColumns(b.columns),
   }));
 
   const summary = computeSummary(rows);
@@ -127,20 +144,117 @@ export function mapCptcPartA(data: CptcPartAData): CptcPartADocument {
   };
 }
 
-function classifyLine(
+function emptyAccountBucket(acct: BudgetLineWithRelations['account']) {
+  return {
+    accountCode: acct.code,
+    accountName: acct.name,
+    isHeader: acct.isHeader,
+    parentId: acct.parentId,
+    sortOrder: acct.sortOrder,
+    columns: {
+      keyCreativeCanadian: 0,
+      keyCreativeNonCanadian: 0,
+      servicesCanadian: 0,
+      servicesNonCanadian: 0,
+      postProductionLabCanadian: 0,
+      postProductionLabNonCanadian: 0,
+      otherCosts: 0,
+    },
+  };
+}
+
+function sumRowColumns(columns: Record<ColumnKey, number>): number {
+  return (
+    columns.keyCreativeCanadian +
+    columns.keyCreativeNonCanadian +
+    columns.servicesCanadian +
+    columns.servicesNonCanadian +
+    columns.postProductionLabCanadian +
+    columns.postProductionLabNonCanadian +
+    columns.otherCosts
+  );
+}
+
+/**
+ * Splits a budget line into classifiable labour (or full) amount and
+ * non-labour remainder based on expenseType and labourAmount.
+ */
+export function resolveLineAmountSplit(line: BudgetLineWithRelations): LineAmountSplit {
+  const amount = Number(line.amount);
+  const warnings: DocumentWarning[] = [];
+  const labourAmount =
+    line.labourAmount != null ? Number(line.labourAmount) : null;
+
+  if (line.expenseType === ExpenseType.NON_LABOUR) {
+    return { classifiableAmount: amount, otherCostsAmount: 0, warnings };
+  }
+
+  if (line.expenseType === ExpenseType.LABOUR) {
+    const classifiableAmount = labourAmount ?? amount;
+    if (labourAmount != null && labourAmount > amount) {
+      warnings.push({
+        fieldId: line.id,
+        severity: 'warning',
+        message: `Budget line "${line.description ?? line.account.name}" has labourAmount exceeding line amount; using line amount.`,
+      });
+    }
+    return {
+      classifiableAmount: Math.min(classifiableAmount, amount),
+      otherCostsAmount: 0,
+      warnings,
+    };
+  }
+
+  if (line.expenseType === ExpenseType.MIXED) {
+    if (labourAmount == null) {
+      warnings.push({
+        fieldId: line.id,
+        severity: 'warning',
+        message: `Budget line "${line.description ?? line.account.name}" is MIXED but labourAmount is not set; classifying full amount.`,
+      });
+      return { classifiableAmount: amount, otherCostsAmount: 0, warnings };
+    }
+
+    const labourPortion = Math.min(Math.max(labourAmount, 0), amount);
+    const nonLabourPortion = Math.max(amount - labourPortion, 0);
+    if (labourAmount < 0 || labourAmount > amount) {
+      warnings.push({
+        fieldId: line.id,
+        severity: 'warning',
+        message: `Budget line "${line.description ?? line.account.name}" has invalid labourAmount for MIXED expense; using clamped split.`,
+      });
+    }
+    return {
+      classifiableAmount: labourPortion,
+      otherCostsAmount: nonLabourPortion,
+      warnings,
+    };
+  }
+
+  return { classifiableAmount: amount, otherCostsAmount: 0, warnings };
+}
+
+export function classifyLine(
   line: BudgetLineWithRelations,
   residencies: Map<string, { residencyType: string; country: string }>,
 ): ColumnKey | null {
   const acct = line.account;
-  const cptcMapping = acct.roleMappings.find(rm => rm.programCode === 'CPTC');
-  const isKeyCreative = cptcMapping != null && CPTC_ROLES.has(cptcMapping.roleCode);
+  const cptcMapping = acct.roleMappings.find((rm) => rm.programCode === 'CPTC');
+  const isKeyCreative =
+    cptcMapping != null && CPTC_ROLES.has(cptcMapping.roleCode);
   const isPostProduction = acct.accountType === 'BELOW_THE_LINE_POST';
   const isOther = acct.accountType === 'OTHER';
 
   if (isOther) return 'otherCosts';
-  if (isPostProduction) return 'postProductionLab';
 
   const isCanadian = resolveCanadian(line, residencies);
+
+  if (isPostProduction) {
+    if (isCanadian === null) return null;
+    return isCanadian
+      ? 'postProductionLabCanadian'
+      : 'postProductionLabNonCanadian';
+  }
 
   if (isKeyCreative) {
     if (isCanadian === null) return null;
@@ -180,7 +294,8 @@ function resolveCanadian(
   return null;
 }
 
-function computeSummary(rows: BocRow[]): BocSummary {
+/** Exported for unit tests. */
+export function computeSummary(rows: BocRow[]): BocSummary {
   let totalCost = 0;
   let svcCan = 0;
   let svcNonCan = 0;
@@ -192,7 +307,8 @@ function computeSummary(rows: BocRow[]): BocSummary {
     totalCost += row.total;
     svcCan += row.servicesCanadian + row.keyCreativeCanadian;
     svcNonCan += row.servicesNonCanadian + row.keyCreativeNonCanadian;
-    postCan += row.postProductionLab;
+    postCan += row.postProductionLabCanadian;
+    postNonCan += row.postProductionLabNonCanadian;
   }
 
   const totalServices = svcCan + svcNonCan;
@@ -209,4 +325,11 @@ function computeSummary(rows: BocRow[]): BocSummary {
     totalPostLab,
     postLabCanadianRatio: totalPostLab > 0 ? postCan / totalPostLab : 0,
   };
+}
+
+function formatCurrency(amount: number): string {
+  return amount.toLocaleString('en-CA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }

@@ -12,14 +12,15 @@ const TITLE_FONT_SIZE = 12;
 
 const COL_WIDTHS = {
   code: 35,
-  name: 170,
-  kcCan: 75,
-  kcNonCan: 75,
-  svcCan: 75,
-  svcNonCan: 75,
-  postLab: 75,
-  other: 75,
-  total: 75,
+  name: 140,
+  kcCan: 62,
+  kcNonCan: 62,
+  svcCan: 62,
+  svcNonCan: 62,
+  postCan: 62,
+  postNonCan: 62,
+  other: 62,
+  total: 62,
 };
 
 const COLUMNS = [
@@ -29,7 +30,8 @@ const COLUMNS = [
   { key: 'kcNonCan' as const, label: 'Key Creative\nNon-Canadian', width: COL_WIDTHS.kcNonCan },
   { key: 'svcCan' as const, label: 'Services\nCanadian', width: COL_WIDTHS.svcCan },
   { key: 'svcNonCan' as const, label: 'Services\nNon-Canadian', width: COL_WIDTHS.svcNonCan },
-  { key: 'postLab' as const, label: 'Post-Prod\n& Lab', width: COL_WIDTHS.postLab },
+  { key: 'postCan' as const, label: 'Post-Prod\nCan.', width: COL_WIDTHS.postCan },
+  { key: 'postNonCan' as const, label: 'Post-Prod\nNon-Can.', width: COL_WIDTHS.postNonCan },
   { key: 'other' as const, label: 'Other\nCosts', width: COL_WIDTHS.other },
   { key: 'total' as const, label: 'Total', width: COL_WIDTHS.total },
 ];
@@ -54,7 +56,8 @@ function rowValues(row: BocRow): string[] {
     fmt(row.keyCreativeNonCanadian),
     fmt(row.servicesCanadian),
     fmt(row.servicesNonCanadian),
-    fmt(row.postProductionLab),
+    fmt(row.postProductionLabCanadian),
+    fmt(row.postProductionLabNonCanadian),
     fmt(row.otherCosts),
     fmt(row.total),
   ];
@@ -102,7 +105,6 @@ export async function renderCptcPartAPdf(
   );
   y -= 20;
 
-  // Column headers
   const headerTop = y;
   page.drawRectangle({
     x: startX,
@@ -190,37 +192,35 @@ export async function renderCptcPartAPdf(
     drawRow(vals, row.isHeader, row.isHeader ? lightBg : undefined);
   }
 
-  // Summary section
   y -= 6;
-  const s = doc.summary;
+  const s: BocSummary = doc.summary;
 
   drawRow(
-    ['11.0', 'TOTAL COST OF PRODUCTION', '', '', '', '', '', '', fmt(s.totalCostOfProduction)],
+    ['11.0', 'TOTAL COST OF PRODUCTION', '', '', '', '', '', '', '', fmt(s.totalCostOfProduction)],
     true,
     headerBg,
   );
   drawRow(
-    ['11.1', 'TOTAL SERVICES', fmt(s.totalServicesCanadian), fmt(s.totalServicesNonCanadian), '', '', '', '', fmt(s.totalServices)],
+    ['11.1', 'TOTAL SERVICES', fmt(s.totalServicesCanadian), fmt(s.totalServicesNonCanadian), '', '', '', '', '', fmt(s.totalServices)],
     false,
     undefined,
   );
   drawRow(
-    ['11.2', 'RATIO % (Can. to non-Can.)', pct(s.servicesCanadianRatio), pct(1 - s.servicesCanadianRatio), '', '', '', '', ''],
+    ['11.2', 'RATIO % (Can. to non-Can.)', pct(s.servicesCanadianRatio), pct(1 - s.servicesCanadianRatio), '', '', '', '', '', ''],
     false,
     undefined,
   );
   drawRow(
-    ['11.3', 'TOTAL POST-PRODUCTION / LAB', '', '', fmt(s.totalPostLabCanadian), fmt(s.totalPostLabNonCanadian), '', '', fmt(s.totalPostLab)],
+    ['11.3', 'TOTAL POST-PRODUCTION / LAB', '', '', '', '', fmt(s.totalPostLabCanadian), fmt(s.totalPostLabNonCanadian), '', fmt(s.totalPostLab)],
     false,
     undefined,
   );
   drawRow(
-    ['11.4', 'RATIO % (Can. to non-Can.)', '', '', pct(s.postLabCanadianRatio), pct(1 - s.postLabCanadianRatio), '', '', ''],
+    ['11.4', 'RATIO % (Can. to non-Can.)', '', '', '', '', pct(s.postLabCanadianRatio), pct(1 - s.postLabCanadianRatio), '', ''],
     false,
     undefined,
   );
 
-  // Warnings footer
   if (doc.warnings.length > 0) {
     y -= 16;
     if (y < MARGIN + 60) {

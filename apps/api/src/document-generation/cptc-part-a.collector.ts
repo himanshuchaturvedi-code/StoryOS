@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@storyos/database';
 import { BudgetVersionStatus } from '@storyos/types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -39,16 +43,25 @@ export class CptcPartACollector extends TenantAwareService {
     });
     if (!project) throw new NotFoundException('Project not found');
 
-    const resolvedVersionId = budgetVersionId ?? await this.resolveBudgetVersionId(projectId);
+    const resolvedVersionId =
+      budgetVersionId ?? (await this.resolveLockedBudgetVersionId(projectId));
     if (!resolvedVersionId) {
-      throw new NotFoundException('No budget version found for this project');
+      throw new BadRequestException(
+        'CPTC Breakdown of Costs requires a LOCKED budget version. Lock a budget version before generating.',
+      );
     }
 
     const version = await this.prisma.budgetVersion.findFirst({
       where: this.tenantFilter({ id: resolvedVersionId }),
-      select: { id: true, name: true },
+      select: { id: true, name: true, status: true },
     });
     if (!version) throw new NotFoundException('Budget version not found');
+
+    if (version.status !== BudgetVersionStatus.LOCKED) {
+      throw new BadRequestException(
+        'CPTC Breakdown of Costs requires a LOCKED budget version. The selected budget version is not locked.',
+      );
+    }
 
     const lines = await this.prisma.budgetLine.findMany({
       where: this.tenantFilter({
@@ -100,7 +113,9 @@ export class CptcPartACollector extends TenantAwareService {
     };
   }
 
-  private async resolveBudgetVersionId(projectId: string): Promise<string | null> {
+  private async resolveLockedBudgetVersionId(
+    projectId: string,
+  ): Promise<string | null> {
     const budget = await this.prisma.budget.findFirst({
       where: this.tenantFilter({ projectId } as Prisma.BudgetWhereInput),
       select: { id: true },
@@ -115,16 +130,7 @@ export class CptcPartACollector extends TenantAwareService {
       orderBy: { versionNumber: 'desc' },
       select: { id: true },
     });
-    if (locked) return locked.id;
 
-    const draft = await this.prisma.budgetVersion.findFirst({
-      where: this.tenantFilter({
-        budgetId: budget.id,
-        status: BudgetVersionStatus.DRAFT,
-      }),
-      orderBy: { versionNumber: 'desc' },
-      select: { id: true },
-    });
-    return draft?.id ?? null;
+    return locked?.id ?? null;
   }
 }
