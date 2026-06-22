@@ -107,18 +107,19 @@ export class BudgetLinesService extends TenantAwareService {
     await this.versionsService.assertVersionDraft(budgetId, versionId);
     const existing = await this.loadLineWithAccount(versionId, lineId);
 
+    const nextAmount =
+      dto.amount !== undefined ? dto.amount : Number(existing.amount);
+    const syncedLabourAmount = resolveWriteLabourAmount({
+      operation: 'amount_change',
+      expenseType: existing.expenseType,
+      accountType: existing.account.accountType,
+      amount: nextAmount,
+      currentLabourAmount:
+        existing.labourAmount != null ? Number(existing.labourAmount) : null,
+    });
+
     const updateData: Record<string, unknown> = { ...dto };
-    if (dto.amount !== undefined) {
-      const syncedLabourAmount = resolveWriteLabourAmount({
-        operation: 'amount_change',
-        expenseType: existing.expenseType,
-        accountType: existing.account.accountType,
-        amount: dto.amount,
-        currentLabourAmount:
-          existing.labourAmount != null ? Number(existing.labourAmount) : null,
-      });
-      updateData.labourAmount = syncedLabourAmount ?? null;
-    }
+    updateData.labourAmount = syncedLabourAmount ?? null;
 
     return this.prisma.budgetLine.update({
       where: { id: lineId },

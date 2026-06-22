@@ -222,6 +222,14 @@ export function resolveBackfillTarget(
   };
 }
 
+export function collectLabourAmountRepairs(
+  lines: Array<BackfillLineInput & { lineKey: string }>,
+): BackfillTarget[] {
+  return lines
+    .map((line) => resolveBackfillTarget(line.lineKey, line))
+    .filter((target): target is BackfillTarget => target != null);
+}
+
 export interface BackfillSummary {
   totalLines: number;
   labourUpdates: number;

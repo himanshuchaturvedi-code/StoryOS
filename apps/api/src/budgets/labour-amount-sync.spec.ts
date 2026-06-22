@@ -1,6 +1,7 @@
 import { ExpenseType } from '@storyos/types';
 import {
   labourAmountsEqual,
+  collectLabourAmountRepairs,
   resolveBackfillTarget,
   resolveEffectiveExpenseType,
   resolveWriteLabourAmount,
@@ -255,6 +256,34 @@ describe('backfill helpers', () => {
         currentLabourAmount: null,
       }),
     ).toBeNull();
+  });
+
+  it('collectLabourAmountRepairs returns only out-of-sync LABOUR/NON_LABOUR rows', () => {
+    const repairs = collectLabourAmountRepairs([
+      {
+        lineKey: 'stale-labour',
+        expenseType: null,
+        accountType: 'ABOVE_THE_LINE',
+        amount: 60000,
+        currentLabourAmount: 50000,
+      },
+      {
+        lineKey: 'mixed',
+        expenseType: ExpenseType.MIXED,
+        accountType: 'ABOVE_THE_LINE',
+        amount: 1000,
+        currentLabourAmount: 600,
+      },
+    ]);
+
+    expect(repairs).toEqual([
+      {
+        lineKey: 'stale-labour',
+        currentLabourAmount: 50000,
+        targetLabourAmount: 60000,
+        effectiveType: ExpenseType.LABOUR,
+      },
+    ]);
   });
 
   it('summarizes backfill counts', () => {

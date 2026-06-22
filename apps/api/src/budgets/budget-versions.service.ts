@@ -10,7 +10,7 @@ import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { BudgetTemplatesService } from '../budget-templates/budget-templates.service';
 import { BudgetsService } from './budgets.service';
 import { CreateBudgetVersionDto } from './dto/create-budget-version.dto';
-import { resolveWriteLabourAmount } from './labour-amount-sync';
+import { resolveWriteLabourAmount, collectLabourAmountRepairs } from './labour-amount-sync';
 
 @Injectable()
 export class BudgetVersionsService extends TenantAwareService {
@@ -74,6 +74,38 @@ export class BudgetVersionsService extends TenantAwareService {
       },
     });
     if (!version) throw new NotFoundException('Budget version not found');
+
+    const repairs = collectLabourAmountRepairs(
+      version.lines.map((line) => ({
+        lineKey: line.id,
+        expenseType: line.expenseType,
+        accountType: line.account.accountType,
+        amount: Number(line.amount),
+        currentLabourAmount:
+          line.labourAmount != null ? Number(line.labourAmount) : null,
+      })),
+    );
+
+    if (repairs.length > 0) {
+      await this.prisma.$transaction(
+        repairs.map((repair) =>
+          this.prisma.budgetLine.update({
+            where: { id: repair.lineKey },
+            data: { labourAmount: repair.targetLabourAmount },
+          }),
+        ),
+      );
+
+      const repairById = new Map(
+        repairs.map((repair) => [repair.lineKey, repair.targetLabourAmount]),
+      );
+      for (const line of version.lines) {
+        const repaired = repairById.get(line.id);
+        if (repaired !== undefined) {
+          line.labourAmount = repaired as typeof line.labourAmount;
+        }
+      }
+    }
 
     const { budget, ...rest } = version;
     return { ...rest, accounts: budget.accounts };

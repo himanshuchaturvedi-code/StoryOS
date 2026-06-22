@@ -59,7 +59,7 @@ describe('BudgetLinesService labour amount sync', () => {
   });
 
   it('update() syncs labourAmount when amount changes on LABOUR lines', async () => {
-    const update = jest.fn().mockResolvedValue({ id: lineId, labourAmount: 2200 });
+    const update = jest.fn().mockResolvedValue({ id: lineId, labourAmount: 2200, amount: 2200 });
     const prisma = {
       budgetLine: {
         findFirst: jest.fn().mockResolvedValue({
@@ -74,13 +74,70 @@ describe('BudgetLinesService labour amount sync', () => {
     };
 
     const service = createService(prisma);
-    await service.update(budgetId, versionId, lineId, { amount: 2200 });
+    const updated = await service.update(budgetId, versionId, lineId, { amount: 2200 });
 
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           amount: 2200,
           labourAmount: 2200,
+        }),
+      }),
+    );
+    expect(updated.labourAmount).toBe(2200);
+  });
+
+  it('update() syncs implicit LABOUR lines when amount changes (null expenseType)', async () => {
+    const update = jest.fn().mockResolvedValue({ id: lineId, labourAmount: 60000, amount: 60000 });
+    const prisma = {
+      budgetLine: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: lineId,
+          expenseType: null,
+          amount: 50000,
+          labourAmount: 50000,
+          account: { accountType: 'ABOVE_THE_LINE' },
+        }),
+        update,
+      },
+    };
+
+    const service = createService(prisma);
+    await service.update(budgetId, versionId, lineId, { amount: 60000 });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          amount: 60000,
+          labourAmount: 60000,
+        }),
+      }),
+    );
+  });
+
+  it('update() self-heals stale labourAmount on implicit LABOUR lines without amount change', async () => {
+    const update = jest.fn().mockResolvedValue({ id: lineId, labourAmount: 60000, amount: 60000 });
+    const prisma = {
+      budgetLine: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: lineId,
+          expenseType: null,
+          amount: 60000,
+          labourAmount: 50000,
+          account: { accountType: 'ABOVE_THE_LINE' },
+        }),
+        update,
+      },
+    };
+
+    const service = createService(prisma);
+    await service.update(budgetId, versionId, lineId, { description: 'Updated role' });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          description: 'Updated role',
+          labourAmount: 60000,
         }),
       }),
     );
