@@ -267,7 +267,7 @@ export function classifyLine(
   return isCanadian ? 'servicesCanadian' : 'servicesNonCanadian';
 }
 
-function resolveCanadian(
+export function resolveCanadian(
   line: BudgetLineWithRelations,
   residencies: Map<string, { residencyType: string; country: string }>,
 ): boolean | null {

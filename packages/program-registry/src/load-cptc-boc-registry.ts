@@ -1,6 +1,7 @@
 import fs from 'fs';
 import yaml from 'js-yaml';
 import type {
+  BocColumnFamily,
   BocColumnKey,
   BocFormRegistry,
   BocLineSourceRule,
@@ -24,6 +25,18 @@ const SUMMARY_FORMULA_TYPES: BocSummaryFormulaType[] = [
   'SUM_POST_LAB_COLUMNS',
   'RATIO_KEY_CREATIVE_CANADIAN',
   'RATIO_POST_LAB_CANADIAN',
+];
+
+const VALID_COLUMN_FAMILIES: readonly BocColumnFamily[] = [
+  'keyCreative',
+  'producerRemuneration',
+  'lineProducerRemuneration',
+  'producerServices',
+  'producerTravel',
+  'lineProducerTravel',
+  'postProduction',
+  'services',
+  'other',
 ];
 
 function assertString(value: unknown, field: string): string {
@@ -127,6 +140,11 @@ function parseRegistry(raw: unknown): BocFormRegistry {
       isHeader: line.isHeader === true ? true : undefined,
       forceEmpty: line.forceEmpty === true ? true : undefined,
       allowedColumns,
+      columnFamily:
+        typeof line.columnFamily === 'string' &&
+        VALID_COLUMN_FAMILIES.includes(line.columnFamily as BocColumnFamily)
+          ? (line.columnFamily as BocColumnFamily)
+          : undefined,
       sources,
     };
   });

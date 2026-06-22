@@ -4,7 +4,7 @@ import {
   mapCptcPartA,
   resolveLineAmountSplit,
 } from './cptc-part-a.mapper';
-import { mapCptcPartAWithRegistry } from './cptc-part-a.mapper-v2';
+import { mapCptcPartAWithRegistry, classifyForFormLine } from './cptc-part-a.mapper-v2';
 import {
   buildBudgetLine,
   buildCptcPartAData,
@@ -12,6 +12,7 @@ import {
   ExpenseType,
 } from './__fixtures__/cptc-part-a.fixtures';
 import type { BocRow } from '@storyos/types';
+import { findLineByCode, loadCptcBocRegistry } from '@storyos/program-registry';
 
 describe('computeSummary', () => {
   it('aggregates services and post-production Canadian/non-Canadian totals', () => {
@@ -230,6 +231,145 @@ describe('mapCptcPartAWithRegistry (Slice 4C)', () => {
     expect(doc.summary.totalServices).toBe(1000);
     expect(doc.rows.find((row) => row.accountCode === '7.5')?.servicesCanadian).toBe(
       500,
+    );
+  });
+});
+
+describe('mapCptcPartAWithRegistry (Slice 4D rollups & column families)', () => {
+  const registry = loadCptcBocRegistry();
+
+  it('rolls fringe benefits into parent remuneration lines with audit trace', () => {
+    const rem = buildBudgetLine({
+      amount: 2000,
+      account: { code: '02.01', name: 'Writer(s)', sortOrder: 1 },
+      personId: 'person-writer',
+    });
+    const fringe = buildBudgetLine({
+      amount: 400,
+      budgetAccountId: 'acct-fringe',
+      account: { id: 'acct-fringe', code: '02.90', name: 'Fringe', sortOrder: 2 },
+      personId: 'person-writer',
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildCptcPartAData([rem, fringe], caCitizenResidency('person-writer')),
+    );
+
+    const screenwriterRow = doc.rows.find((row) => row.accountCode === '2.0.a');
+    expect(screenwriterRow?.keyCreativeCanadian).toBe(2400);
+    expect(screenwriterRow?.servicesCanadian).toBe(0);
+    expect(doc.rows.some((row) => row.accountCode === '02.90')).toBe(false);
+    expect(doc.allocationTrace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountCode: '02.90',
+          formLineCode: '2.0.a',
+          rollupKind: 'fringe',
+          column: 'keyCreativeCanadian',
+          amount: 400,
+        }),
+      ]),
+    );
+  });
+
+  it('places travel accounts on KC travel sub-lines instead of Services', () => {
+    const travel = buildBudgetLine({
+      amount: 750,
+      account: { code: '05.60', name: 'Director travel', sortOrder: 1 },
+      personId: 'person-director',
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildCptcPartAData([travel], caCitizenResidency('person-director')),
+    );
+
+    const travelRow = doc.rows.find((row) => row.accountCode === '5.0.b');
+    expect(travelRow?.keyCreativeCanadian).toBe(750);
+    expect(travelRow?.servicesCanadian).toBe(0);
+    expect(doc.allocationTrace?.[0]).toMatchObject({
+      accountCode: '05.60',
+      formLineCode: '5.0.b',
+      rollupKind: 'travel',
+      column: 'keyCreativeCanadian',
+    });
+  });
+
+  it('uses producer column families for section 4.x placement', () => {
+    const producerRem = buildBudgetLine({
+      amount: 3000,
+      account: { code: '04.05', name: 'Producer', sortOrder: 1 },
+      personId: 'person-producer',
+    });
+    const producerTravel = buildBudgetLine({
+      amount: 500,
+      budgetAccountId: 'acct-travel',
+      account: { id: 'acct-travel', code: '04.60', name: 'Producer travel', sortOrder: 2 },
+      personId: 'person-producer',
+    });
+    const execRem = buildBudgetLine({
+      amount: 1200,
+      budgetAccountId: 'acct-exec',
+      account: { id: 'acct-exec', code: '04.01', name: 'Executive producer', sortOrder: 3 },
+      personId: 'person-exec',
+    });
+
+    const residencies = new Map([
+      ['person-producer', { residencyType: 'CITIZEN', country: 'CA' }],
+      ['person-exec', { residencyType: 'CITIZEN', country: 'CA' }],
+    ]);
+
+    const doc = mapCptcPartAWithRegistry(
+      buildCptcPartAData([producerRem, producerTravel, execRem], residencies),
+    );
+
+    expect(doc.rows.find((row) => row.accountCode === '4.0.a')).toMatchObject({
+      keyCreativeCanadian: 3000,
+      servicesCanadian: 0,
+    });
+    expect(doc.rows.find((row) => row.accountCode === '4.0.b')).toMatchObject({
+      keyCreativeCanadian: 500,
+      servicesCanadian: 0,
+    });
+    expect(doc.rows.find((row) => row.accountCode === '4.3.a')).toMatchObject({
+      keyCreativeCanadian: 0,
+      servicesCanadian: 1200,
+    });
+  });
+
+  it('preserves document totals when fringe is rolled into remuneration', () => {
+    const rem = buildBudgetLine({
+      amount: 1000,
+      account: { code: '05.01', name: 'Director', sortOrder: 1 },
+      personId: 'person-director',
+    });
+    const fringe = buildBudgetLine({
+      amount: 200,
+      budgetAccountId: 'acct-fringe',
+      account: { id: 'acct-fringe', code: '05.90', name: 'Director fringe', sortOrder: 2 },
+      personId: 'person-director',
+    });
+
+    const doc = mapCptcPartAWithRegistry(
+      buildCptcPartAData([rem, fringe], caCitizenResidency('person-director')),
+    );
+
+    expect(doc.summary.totalCostOfProduction).toBe(1200);
+    expect(doc.rows.find((row) => row.accountCode === '5.0.a')?.total).toBe(1200);
+  });
+
+  it('classifyForFormLine prefers form rules over CPTC role inference for producers', () => {
+    const line = buildBudgetLine({
+      amount: 1000,
+      personId: 'person-producer',
+      account: {
+        code: '04.05',
+        roleMappings: [{ programCode: 'CPTC', roleCode: 'DIRECTOR' } as never],
+      },
+    });
+    const formLine = findLineByCode(registry, '4.0.a')!;
+
+    expect(classifyForFormLine(line, caCitizenResidency('person-producer'), formLine)).toBe(
+      'keyCreativeCanadian',
     );
   });
 });

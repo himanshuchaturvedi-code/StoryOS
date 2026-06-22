@@ -1,4 +1,5 @@
 import type {
+  BocColumnFamily,
   BocFormLineDefinition,
   BocFormRegistry,
   BocLineSourceRule,
@@ -10,7 +11,32 @@ import { accountMatchesAnyPattern, accountMatchesRule } from './pattern-match';
 import { parseTelefilmTemplateAccounts } from './telefilm-template-accounts';
 import { resolveFromMonorepoRoot } from './paths';
 
+const VALID_COLUMN_FAMILIES: readonly BocColumnFamily[] = [
+  'keyCreative',
+  'producerRemuneration',
+  'lineProducerRemuneration',
+  'producerServices',
+  'producerTravel',
+  'lineProducerTravel',
+  'postProduction',
+  'services',
+  'other',
+];
+
 const EXPECTED_SUMMARY_CODES = ['11.0', '11.1', '11.2', '11.3', '11.4'] as const;
+
+const PRODUCER_COLUMN_FAMILIES: readonly BocColumnFamily[] = [
+  'producerRemuneration',
+  'lineProducerRemuneration',
+  'producerServices',
+  'producerTravel',
+  'lineProducerTravel',
+];
+
+function lineCodeSuffix(code: string): string | null {
+  const match = code.match(/\.([a-z])$/);
+  return match?.[1] ?? null;
+}
 
 export interface AccountLineMapping {
   accountCode: string;
@@ -203,6 +229,39 @@ export function validateCptcBocRegistry(
           'error',
           'MISSING_ALLOWED_COLUMNS',
           `Line ${line.code} has sources but no allowedColumns`,
+          { lineCode: line.code },
+        ),
+      );
+    }
+
+    if (
+      line.columnFamily != null &&
+      !VALID_COLUMN_FAMILIES.includes(line.columnFamily)
+    ) {
+      errors.push(
+        issue(
+          'error',
+          'INVALID_COLUMN_FAMILY',
+          `Line ${line.code} has invalid columnFamily "${line.columnFamily}"`,
+          { lineCode: line.code, columnFamily: line.columnFamily },
+        ),
+      );
+    }
+
+    const suffix = lineCodeSuffix(line.code);
+    if (
+      line.code.startsWith('4.') &&
+      suffix != null &&
+      (suffix === 'a' || suffix === 'b') &&
+      lineHasSources(line) &&
+      (line.columnFamily == null ||
+        !PRODUCER_COLUMN_FAMILIES.includes(line.columnFamily))
+    ) {
+      warnings.push(
+        issue(
+          'warning',
+          'MISSING_PRODUCER_COLUMN_FAMILY',
+          `Producer form line ${line.code} should declare a producer columnFamily`,
           { lineCode: line.code },
         ),
       );

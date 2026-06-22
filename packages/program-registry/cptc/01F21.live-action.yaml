@@ -3,7 +3,7 @@ meta:
   formCode: "01F21"
   formLabel: Breakdown of Costs — Live Action
   formVersion: "2023-03-23"
-  registryVersion: "2026.06.1"
+  registryVersion: "2026.06.2"
   templateVersion: telefilm-doc-v1
 
 templates:
@@ -40,6 +40,7 @@ lines:
   - code: "2.0.a"
     parentCode: "2.0"
     label: Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -51,6 +52,7 @@ lines:
   - code: "2.0.b"
     parentCode: "2.0"
     label: Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -89,6 +91,7 @@ lines:
   - code: "4.0.a"
     parentCode: "4.0"
     label: Remuneration & fringe benefits
+    columnFamily: producerRemuneration
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -102,6 +105,7 @@ lines:
   - code: "4.0.b"
     parentCode: "4.0"
     label: Travel & living expenses
+    columnFamily: producerTravel
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -121,6 +125,7 @@ lines:
   - code: "4.1.a"
     parentCode: "4.1"
     label: Co-producer(s) — Remuneration & fringe benefits
+    columnFamily: producerRemuneration
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -133,6 +138,7 @@ lines:
   - code: "4.1.b"
     parentCode: "4.1"
     label: Co-producer(s) — Travel & living expenses
+    columnFamily: producerTravel
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -148,6 +154,7 @@ lines:
   - code: "4.2.a"
     parentCode: "4.2"
     label: Line producer(s) — Remuneration & fringe benefits
+    columnFamily: lineProducerRemuneration
     allowedColumns:
       - keyCreativeCanadian
       - servicesCanadian
@@ -159,6 +166,7 @@ lines:
   - code: "4.2.b"
     parentCode: "4.2"
     label: Line producer(s) — Travel & living expenses
+    columnFamily: lineProducerTravel
     allowedColumns:
       - keyCreativeCanadian
       - servicesCanadian
@@ -173,6 +181,7 @@ lines:
   - code: "4.3.a"
     parentCode: "4.3"
     label: Executive producer(s) — Remuneration & fringe benefits
+    columnFamily: producerServices
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -183,6 +192,7 @@ lines:
   - code: "4.3.b"
     parentCode: "4.3"
     label: Executive producer(s) — Travel & living expenses
+    columnFamily: producerTravel
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -196,6 +206,7 @@ lines:
   - code: "4.4.a"
     parentCode: "4.4"
     label: Associate producer(s) — Remuneration & fringe benefits
+    columnFamily: producerServices
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -206,6 +217,7 @@ lines:
   - code: "4.4.b"
     parentCode: "4.4"
     label: Associate producer(s) — Travel & living expenses
+    columnFamily: producerTravel
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -219,6 +231,7 @@ lines:
   - code: "4.5.a"
     parentCode: "4.5"
     label: Other producer-related personnel — Remuneration & fringe benefits
+    columnFamily: producerServices
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -229,6 +242,7 @@ lines:
   - code: "4.5.b"
     parentCode: "4.5"
     label: Other producer-related personnel — Travel & living expenses
+    columnFamily: producerTravel
     allowedColumns:
       - servicesCanadian
       - servicesNonCanadian
@@ -251,6 +265,7 @@ lines:
   - code: "5.0.a"
     parentCode: "5.0"
     label: Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -262,6 +277,7 @@ lines:
   - code: "5.0.b"
     parentCode: "5.0"
     label: Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -295,6 +311,7 @@ lines:
   - code: "6.1.a"
     parentCode: "6.1"
     label: 1st lead performer — Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -306,6 +323,7 @@ lines:
   - code: "6.1.b"
     parentCode: "6.1"
     label: 1st lead performer — Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -323,6 +341,7 @@ lines:
   - code: "6.2.a"
     parentCode: "6.2"
     label: 2nd lead performer — Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -333,6 +352,7 @@ lines:
   - code: "6.2.b"
     parentCode: "6.2"
     label: 2nd lead performer — Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -376,6 +396,7 @@ lines:
   - code: "7.1.a"
     parentCode: "7.1"
     label: Production designer — Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -387,6 +408,7 @@ lines:
   - code: "7.1.b"
     parentCode: "7.1"
     label: Production designer — Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -411,6 +433,7 @@ lines:
   - code: "7.2.a"
     parentCode: "7.2"
     label: Director of photography — Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -422,6 +445,7 @@ lines:
   - code: "7.2.b"
     parentCode: "7.2"
     label: Director of photography — Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -800,6 +824,7 @@ lines:
   - code: "9.1.a"
     parentCode: "9.1"
     label: Editorial labour — Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -811,6 +836,7 @@ lines:
   - code: "9.1.b"
     parentCode: "9.1"
     label: Editorial labour — Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -885,6 +911,7 @@ lines:
   - code: "9.7.a"
     parentCode: "9.7"
     label: Music composer(s) — Remuneration & fringe benefits
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian
@@ -896,6 +923,7 @@ lines:
   - code: "9.7.b"
     parentCode: "9.7"
     label: Music composer(s) — Travel & living expenses
+    columnFamily: keyCreative
     allowedColumns:
       - keyCreativeCanadian
       - keyCreativeNonCanadian

@@ -15,6 +15,30 @@ export const BOC_COLUMN_KEYS = [
 
 export type BocColumnKey = (typeof BOC_COLUMN_KEYS)[number];
 
+/** Column placement family for 01F21 form lines (overrides CPTC role inference). */
+export type BocColumnFamily =
+  | 'keyCreative'
+  | 'producerRemuneration'
+  | 'lineProducerRemuneration'
+  | 'producerServices'
+  | 'producerTravel'
+  | 'lineProducerTravel'
+  | 'postProduction'
+  | 'services'
+  | 'other';
+
+export const BOC_COLUMN_FAMILIES: readonly BocColumnFamily[] = [
+  'keyCreative',
+  'producerRemuneration',
+  'lineProducerRemuneration',
+  'producerServices',
+  'producerTravel',
+  'lineProducerTravel',
+  'postProduction',
+  'services',
+  'other',
+];
+
 export type BocSummaryFormulaType =
   | 'SUM_LINE_TOTALS'
   | 'SUM_KEY_CREATIVE_COLUMNS'
@@ -53,6 +77,8 @@ export interface BocFormLineDefinition {
   /** When true, value columns must remain empty on the official form (e.g. 10.1). */
   forceEmpty?: boolean;
   allowedColumns: BocColumnKey[];
+  /** Overrides CPTC role / accountType column inference for this form line. */
+  columnFamily?: BocColumnFamily;
   sources?: BocLineSourceRule[];
 }
 
@@ -111,4 +137,16 @@ export interface BocRegistryCoverageReport {
   excludedFromCoverage: number;
   topUnmappedSections: BocUnmappedSectionSummary[];
   unmappedAccountCodes: string[];
+}
+
+export type BocAllocationRollupKind = 'direct' | 'fringe' | 'travel';
+
+/** Internal audit trace for budget line → 01F21 placement (not rendered on PDF). */
+export interface BocAllocationTrace {
+  budgetLineId: string;
+  accountCode: string;
+  amount: number;
+  formLineCode: string;
+  column: BocColumnKey;
+  rollupKind: BocAllocationRollupKind;
 }

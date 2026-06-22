@@ -5,6 +5,7 @@ import {
   lineMapsAccount,
   loadCptcBocRegistry,
   loadCptcBocRegistryFromString,
+  resolvePrimaryFormLineForAccount,
   validateCptcBocRegistry,
 } from '@storyos/program-registry';
 
@@ -221,5 +222,15 @@ summaryLines:
     const result = validateCptcBocRegistry(shared, { validateCoverage: false });
     expect(result.errors.filter((error) => error.code.includes('CONFLICTING'))).toEqual([]);
     expect(result.valid).toBe(true);
+  });
+
+  it('prioritizes fringe rollup targets over pattern matches when resolving primary line', () => {
+    const primary = resolvePrimaryFormLineForAccount(
+      registry,
+      CPTC_BOC_REGISTRY_TEMPLATE_ID,
+      '02.90',
+    );
+
+    expect(primary?.code).toBe('2.0.a');
   });
 });

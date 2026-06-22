@@ -1,4 +1,6 @@
 import type {
+  BocAllocationTrace,
+  BocColumnFamily,
   BocColumnKey,
   BocFormLineDefinition,
   BocFormRegistry,
@@ -13,10 +15,13 @@ import {
   loadCptcBocRegistry,
   resolveFormLinesForAccount,
   resolvePrimaryFormLineForAccount,
+  resolveRollupKindForAccount,
 } from '@storyos/program-registry';
+import type { BudgetLineWithRelations } from './cptc-part-a.collector';
 import type { CptcPartAData } from './cptc-part-a.collector';
 import {
   classifyLine,
+  resolveCanadian,
   resolveLineAmountSplit,
   type ColumnKey,
 } from './cptc-part-a.mapper';
@@ -76,6 +81,103 @@ function addToColumn(columns: ColumnTotals, column: BocColumnKey, amount: number
   columns[column] += amount;
 }
 
+function columnFromKeyCreativeResidency(
+  isCanadian: boolean,
+  allowedColumns: BocColumnKey[],
+): BocColumnKey | null {
+  if (isCanadian) {
+    return allowedColumns.includes('keyCreativeCanadian') ? 'keyCreativeCanadian' : null;
+  }
+  return allowedColumns.includes('keyCreativeNonCanadian')
+    ? 'keyCreativeNonCanadian'
+    : null;
+}
+
+function columnFromProducerResidency(
+  isCanadian: boolean,
+  allowedColumns: BocColumnKey[],
+): BocColumnKey | null {
+  if (isCanadian) {
+    if (allowedColumns.includes('keyCreativeCanadian')) {
+      return 'keyCreativeCanadian';
+    }
+    if (allowedColumns.includes('servicesCanadian')) {
+      return 'servicesCanadian';
+    }
+    return null;
+  }
+
+  if (allowedColumns.includes('servicesNonCanadian')) {
+    return 'servicesNonCanadian';
+  }
+  if (allowedColumns.includes('keyCreativeNonCanadian')) {
+    return 'keyCreativeNonCanadian';
+  }
+  return null;
+}
+
+function columnFromServicesResidency(
+  isCanadian: boolean,
+  allowedColumns: BocColumnKey[],
+): BocColumnKey | null {
+  if (isCanadian) {
+    return allowedColumns.includes('servicesCanadian') ? 'servicesCanadian' : null;
+  }
+  return allowedColumns.includes('servicesNonCanadian') ? 'servicesNonCanadian' : null;
+}
+
+/**
+ * Registry-driven column placement for 01F21 form lines.
+ * Form column families take precedence over CPTC role inference.
+ */
+export function classifyForFormLine(
+  line: BudgetLineWithRelations,
+  residencies: Map<string, { residencyType: string; country: string }>,
+  formLine: BocFormLineDefinition,
+): ColumnKey | null {
+  const acct = line.account;
+  if (acct.accountType === 'OTHER') {
+    return formLine.allowedColumns.includes('otherCosts') ? 'otherCosts' : null;
+  }
+
+  const isCanadian = resolveCanadian(line, residencies);
+  const family = formLine.columnFamily;
+
+  if (family === 'other') {
+    return formLine.allowedColumns.includes('otherCosts') ? 'otherCosts' : null;
+  }
+
+  if (family === 'postProduction') {
+    if (isCanadian === null) return null;
+    const column = isCanadian
+      ? 'postProductionLabCanadian'
+      : 'postProductionLabNonCanadian';
+    return formLine.allowedColumns.includes(column) ? column : null;
+  }
+
+  if (family === 'keyCreative') {
+    if (isCanadian === null) return null;
+    return columnFromKeyCreativeResidency(isCanadian, formLine.allowedColumns);
+  }
+
+  if (
+    family === 'producerRemuneration' ||
+    family === 'lineProducerRemuneration' ||
+    family === 'producerTravel' ||
+    family === 'lineProducerTravel'
+  ) {
+    if (isCanadian === null) return null;
+    return columnFromProducerResidency(isCanadian, formLine.allowedColumns);
+  }
+
+  if (family === 'producerServices' || family === 'services') {
+    if (isCanadian === null) return null;
+    return columnFromServicesResidency(isCanadian, formLine.allowedColumns);
+  }
+
+  return classifyLine(line, residencies);
+}
+
 /**
  * Maps collected budget data into official 01F21 form lines using the CPTC BOC registry.
  */
@@ -85,6 +187,7 @@ export function mapCptcPartAWithRegistry(
   templateId: string = registry.meta.templateVersion || CPTC_BOC_REGISTRY_TEMPLATE_ID,
 ): CptcPartADocument {
   const warnings: DocumentWarning[] = [];
+  const allocationTrace: BocAllocationTrace[] = [];
   const lineBuckets = new Map<string, ColumnTotals>();
 
   for (const formLine of registry.lines) {
@@ -137,11 +240,28 @@ export function mapCptcPartAWithRegistry(
 
     const bucket = lineBuckets.get(primaryLine.code)!;
     const allowedColumns = primaryLine.allowedColumns;
+    const rollupKind = resolveRollupKindForAccount(primaryLine, templateId, accountCode);
+
+    const recordTrace = (column: BocColumnKey, traceAmount: number) => {
+      allocationTrace.push({
+        budgetLineId: line.id,
+        accountCode,
+        amount: traceAmount,
+        formLineCode: primaryLine.code,
+        column,
+        rollupKind,
+      });
+    };
 
     if (split.otherCostsAmount > 0) {
-      const otherColumn = placeAmountInAllowedColumn('otherCosts', split.otherCostsAmount, allowedColumns);
+      const otherColumn = placeAmountInAllowedColumn(
+        'otherCosts',
+        split.otherCostsAmount,
+        allowedColumns,
+      );
       if (otherColumn) {
         addToColumn(bucket, otherColumn, split.otherCostsAmount);
+        recordTrace(otherColumn, split.otherCostsAmount);
       } else {
         columnConstraintCount++;
       }
@@ -149,7 +269,11 @@ export function mapCptcPartAWithRegistry(
 
     if (split.classifiableAmount === 0) continue;
 
-    const classified = classifyLine(line, data.residencies);
+    const classified =
+      primaryLine.columnFamily != null
+        ? classifyForFormLine(line, data.residencies, primaryLine)
+        : classifyLine(line, data.residencies);
+
     if (classified == null) {
       unclassifiedCount++;
     }
@@ -170,6 +294,7 @@ export function mapCptcPartAWithRegistry(
     }
 
     addToColumn(bucket, targetColumn, split.classifiableAmount);
+    recordTrace(targetColumn, split.classifiableAmount);
   }
 
   if (ineligibleExcludedCount > 0) {
@@ -229,6 +354,7 @@ export function mapCptcPartAWithRegistry(
     rows,
     summary,
     warnings,
+    allocationTrace,
     generatedAt: new Date(),
   };
 }

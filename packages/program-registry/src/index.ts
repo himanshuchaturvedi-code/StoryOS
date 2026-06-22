@@ -12,6 +12,7 @@ export { matchAccountPattern, accountMatchesRule, accountMatchesAnyPattern } fro
 export {
   resolveFormLinesForAccount,
   resolvePrimaryFormLineForAccount,
+  resolveRollupKindForAccount,
   isLineCodeWithinRange,
   compareFormLineCodes,
 } from './resolve-form-line';

@@ -3,6 +3,10 @@
  * Will evolve as more document types are added.
  */
 
+import type { BocAllocationTrace } from './boc-registry';
+
+export * from './boc-registry';
+
 export type DocumentTypeCode = 'CPTC_PART_A';
 
 export interface DocumentWarning {
@@ -46,7 +50,7 @@ export interface CptcPartADocument {
   rows: BocRow[];
   summary: BocSummary;
   warnings: DocumentWarning[];
+  /** Budget-line allocation audit trail (Slice 4D+, not rendered on PDF). */
+  allocationTrace?: BocAllocationTrace[];
   generatedAt: Date;
 }
-
-export * from './boc-registry';
