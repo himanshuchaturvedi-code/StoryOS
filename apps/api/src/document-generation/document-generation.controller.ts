@@ -27,25 +27,42 @@ export class DocumentGenerationController {
     @Query('budgetVersionId') budgetVersionId: string | undefined,
     @Res() res: Response,
   ) {
-    if (documentType !== 'CPTC_PART_A') {
-      return res.status(HttpStatus.BAD_REQUEST).json({
-        message: `Unsupported document type: ${documentType}. Currently supported: CPTC_PART_A`,
+    if (documentType === 'CPTC_PART_A') {
+      const result = await this.service.generateCptcPartA(
+        projectId,
+        budgetVersionId,
+      );
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${result.fileName}"`,
+        'Content-Length': result.pdfBuffer.length.toString(),
+        'X-Document-Id': result.documentId,
+        'X-Document-Warnings': JSON.stringify(result.warnings),
       });
+
+      return res.status(HttpStatus.OK).send(result.pdfBuffer);
     }
 
-    const result = await this.service.generateCptcPartA(
-      projectId,
-      budgetVersionId,
-    );
+    if (documentType === 'AMPG_AB_SPEND_SUMMARY') {
+      const result = await this.service.generateAmpgAbSpendSummary(
+        projectId,
+        budgetVersionId,
+      );
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${result.fileName}"`,
-      'Content-Length': result.pdfBuffer.length.toString(),
-      'X-Document-Id': result.documentId,
-      'X-Document-Warnings': JSON.stringify(result.warnings),
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${result.fileName}"`,
+        'Content-Length': result.pdfBuffer.length.toString(),
+        'X-Document-Id': result.documentId,
+        'X-Document-Warnings': JSON.stringify(result.warnings),
+      });
+
+      return res.status(HttpStatus.OK).send(result.pdfBuffer);
+    }
+
+    return res.status(HttpStatus.BAD_REQUEST).json({
+      message: `Unsupported document type: ${documentType}. Currently supported: CPTC_PART_A, AMPG_AB_SPEND_SUMMARY`,
     });
-
-    return res.status(HttpStatus.OK).send(result.pdfBuffer);
   }
 }

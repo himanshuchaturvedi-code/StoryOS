@@ -1,52 +1,47 @@
 import {
-  CPTC_BOC_DOCUMENT_CODE,
-  CPTC_BOC_PROGRAM_CODE,
+  AMPG_SPEND_SUMMARY_DOCUMENT_CODE,
+  AMPG_SPEND_SUMMARY_PROGRAM_CODE,
   DocumentGenerationService,
 } from './document-generation.service';
-import { CptcPartACollector } from './cptc-part-a.collector';
 import { AmpgBudgetCollector } from './ampg-budget.collector';
+import { CptcPartACollector } from './cptc-part-a.collector';
 import { StorageService } from '../documents/storage.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContext } from '../tenant/tenant.context';
 
 jest.mock('../documents/program-document-tag.validation', () => ({
-  assertValidProgramDocumentTag: jest.fn(() => ({
-    programCode: 'CPTC',
-    programDocumentCode: 'CAVCO_PART_A',
+  assertValidProgramDocumentTag: jest.fn((programCode, programDocumentCode) => ({
+    programCode,
+    programDocumentCode,
   })),
 }));
 
-jest.mock('./cptc-part-a.mapper-v2', () => ({
-  mapCptcPartAWithRegistry: jest.fn(() => ({
-    documentType: 'CPTC_PART_A',
-    projectTitle: 'Test Production',
+jest.mock('./ampg-spend-summary.mapper', () => ({
+  mapAmpgSpendSummary: jest.fn(() => ({
+    documentType: 'AMPG_AB_SPEND_SUMMARY',
+    projectTitle: 'Alberta Pilot Production',
     budgetVersionId: 'version-1',
     budgetVersionName: 'Locked v1',
-    formCode: '01F21',
-    formLabel: 'Breakdown of Costs — Live Action',
-    summaryLineDefinitions: [],
     rows: [],
     summary: {
-      totalCostOfProduction: 0,
-      totalServicesCanadian: 0,
-      totalServicesNonCanadian: 0,
-      totalServices: 0,
-      servicesCanadianRatio: 0,
-      totalPostLabCanadian: 0,
-      totalPostLabNonCanadian: 0,
-      totalPostLab: 0,
-      postLabCanadianRatio: 0,
+      albertaLabourTotal: 50000,
+      albertaNonLabourTotal: 15000,
+      totalAlbertaEligibleSpend: 65000,
+      totalProductionBudget: 80000,
+      albertaSpendRatio: 0.8125,
+      estimatedAmpgGrantBase: 65000,
+      estimatedAmpgGrantAmount: 16250,
     },
     warnings: [],
     generatedAt: new Date('2026-06-21T00:00:00.000Z'),
   })),
 }));
 
-jest.mock('./pdf.renderer', () => ({
-  renderCptcPartAPdf: jest.fn(async () => Buffer.from('pdf-bytes')),
+jest.mock('./ampg-spend-summary.renderer', () => ({
+  renderAmpgSpendSummaryPdf: jest.fn(async () => Buffer.from('ampg-pdf-bytes')),
 }));
 
-describe('DocumentGenerationService Slice 2', () => {
+describe('DocumentGenerationService AMPG spend summary', () => {
   const organizationId = 'org-1';
   const projectId = 'project-1';
   const userId = 'user-1';
@@ -77,17 +72,15 @@ describe('DocumentGenerationService Slice 2', () => {
       putObject: jest.fn(async () => undefined),
     };
 
-    cptcCollector = {
+    cptcCollector = { collect: jest.fn() };
+    ampgCollector = {
       collect: jest.fn(async () => ({
-        project: { id: projectId, title: 'Test Production' },
-        projectFormat: null,
+        project: { id: projectId, title: 'Alberta Pilot Production' },
         budgetVersionId: 'version-1',
         budgetVersionName: 'Locked v1',
         lines: [],
-        residencies: new Map(),
       })),
     };
-    ampgCollector = { collect: jest.fn() };
 
     const tenant = { organizationId, userId } as TenantContext;
 
@@ -100,20 +93,20 @@ describe('DocumentGenerationService Slice 2', () => {
     );
   });
 
-  it('persists canonical storage key and CPTC program document tags', async () => {
-    const result = await service.generateCptcPartA(projectId);
+  it('persists canonical storage key and AMPG program document tags', async () => {
+    const result = await service.generateAmpgAbSpendSummary(projectId);
 
     expect(storage.buildKey).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId,
         projectId,
-        fileName: expect.stringMatching(/^CPTC_BOC_01F21_/),
+        fileName: expect.stringMatching(/^AMPG_AB_SPEND_/),
       }),
     );
 
     expect(storage.putObject).toHaveBeenCalledWith(
       expect.stringMatching(
-        /^documents\/org-1\/project-1\/[0-9a-f-]+\/CPTC_BOC_01F21_/,
+        /^documents\/org-1\/project-1\/[0-9a-f-]+\/AMPG_AB_SPEND_/,
       ),
       expect.any(Buffer),
       'application/pdf',
@@ -125,12 +118,12 @@ describe('DocumentGenerationService Slice 2', () => {
         organizationId,
         projectId,
         uploadedById: userId,
-        title: 'CPTC BOC 01F21 — Breakdown of Costs — Live Action — Test Production',
-        category: 'CAVCO_PART_A',
-        programCode: CPTC_BOC_PROGRAM_CODE,
-        programDocumentCode: CPTC_BOC_DOCUMENT_CODE,
+        title: 'AMPG Alberta Spend Summary — Alberta Pilot Production',
+        category: 'OTHER',
+        programCode: AMPG_SPEND_SUMMARY_PROGRAM_CODE,
+        programDocumentCode: AMPG_SPEND_SUMMARY_DOCUMENT_CODE,
         storageKey: expect.stringMatching(
-          /^documents\/org-1\/project-1\/[0-9a-f-]+\/CPTC_BOC_01F21_/,
+          /^documents\/org-1\/project-1\/[0-9a-f-]+\/AMPG_AB_SPEND_/,
         ),
         fileType: 'application/pdf',
       }),
@@ -139,6 +132,6 @@ describe('DocumentGenerationService Slice 2', () => {
     expect(result.documentId).toBe(
       prisma.document.create.mock.calls[0][0].data.id,
     );
-    expect(result.pdfBuffer).toEqual(Buffer.from('pdf-bytes'));
+    expect(result.pdfBuffer).toEqual(Buffer.from('ampg-pdf-bytes'));
   });
 });
