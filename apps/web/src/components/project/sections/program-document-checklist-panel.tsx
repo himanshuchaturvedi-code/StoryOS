@@ -3,9 +3,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import {
+  AMPG_LABOUR_SUMMARY_DOCUMENT_CODE,
+  AMPG_SPEND_SUMMARY_DOCUMENT_CODE,
+  generateAmpgAbLabourSummary,
+  generateAmpgAbSpendSummary,
+  type DocumentGenerationWarning,
+} from '@/lib/generate-ampg-document';
+import {
   CPTC_BOC_DOCUMENT_CODE,
   generateCptcPartA,
-  type CptcGenerationWarning,
 } from '@/lib/generate-cptc-part-a';
 import { Button } from '@storyos/ui';
 import {
@@ -60,6 +66,8 @@ interface ProgramDocumentChecklistPanelProps {
   programs: ChecklistProgramRef[];
   /** When true, CPTC applications can generate CAVCO Part A from the checklist. */
   enableCptcGeneration?: boolean;
+  /** When true, AMPG applications can generate Alberta summaries from the checklist. */
+  enableAmpgGeneration?: boolean;
 }
 
 function statusBadgeClass(status: DocumentChecklistItemStatus) {
@@ -130,29 +138,46 @@ function collectSanitizedWarnings(checklist: DocumentChecklistResponse): string[
   return [...warnings];
 }
 
-function warningSeverityClass(severity: CptcGenerationWarning['severity']) {
+function warningSeverityClass(severity: DocumentGenerationWarning['severity']) {
   if (severity === 'error') return 'text-red-800';
   if (severity === 'info') return 'text-blue-800';
   return 'text-amber-900';
+}
+
+function checklistHelpText(
+  enableCptcGeneration: boolean,
+  enableAmpgGeneration: boolean,
+): string {
+  if (enableCptcGeneration) {
+    return 'Upload documents from the Documents tab, or generate CAVCO Part A Breakdown of Costs from a locked budget.';
+  }
+  if (enableAmpgGeneration) {
+    return 'Upload documents from the Documents tab, or generate Alberta Spend / Labour summaries from a locked budget.';
+  }
+  return 'Upload documents from the Documents tab; matching is based on document type and project uploads.';
 }
 
 function ProgramChecklistCard({
   checklist,
   programName,
   enableCptcGeneration,
-  isGenerating,
-  onGenerateCptcBoc,
+  enableAmpgGeneration,
+  generatingDocumentCode,
+  onGenerateDocument,
 }: {
   checklist: DocumentChecklistResponse;
   programName: string;
   enableCptcGeneration: boolean;
-  isGenerating: boolean;
-  onGenerateCptcBoc?: () => void;
+  enableAmpgGeneration: boolean;
+  generatingDocumentCode: string | null;
+  onGenerateDocument?: (documentCode: string) => void;
 }) {
   const warnings = collectSanitizedWarnings(checklist);
   const stagesWithDocs = checklist.stages.filter((stage) => stage.documents.length > 0);
   const canGenerateCptc =
-    enableCptcGeneration && checklist.programCode === 'CPTC' && onGenerateCptcBoc;
+    enableCptcGeneration && checklist.programCode === 'CPTC' && onGenerateDocument;
+  const canGenerateAmpg =
+    enableAmpgGeneration && checklist.programCode === 'AMPG' && onGenerateDocument;
 
   return (
     <article className="rounded-md border border-gray-100 bg-gray-50/50 p-4">
@@ -209,7 +234,13 @@ function ProgramChecklistCard({
                 })
                 .map((doc) => {
                   const showGenerate =
-                    canGenerateCptc && doc.documentCode === CPTC_BOC_DOCUMENT_CODE;
+                    (canGenerateCptc && doc.documentCode === CPTC_BOC_DOCUMENT_CODE) ||
+                    (canGenerateAmpg &&
+                      (doc.documentCode === AMPG_SPEND_SUMMARY_DOCUMENT_CODE ||
+                        doc.documentCode === AMPG_LABOUR_SUMMARY_DOCUMENT_CODE));
+                  const isGeneratingThisDoc = generatingDocumentCode === doc.documentCode;
+                  const isGeneratingOtherDoc =
+                    generatingDocumentCode != null && !isGeneratingThisDoc;
 
                   return (
                     <li
@@ -226,10 +257,10 @@ function ProgramChecklistCard({
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={isGenerating}
-                            onClick={onGenerateCptcBoc}
+                            disabled={isGeneratingOtherDoc || isGeneratingThisDoc}
+                            onClick={() => onGenerateDocument?.(doc.documentCode)}
                           >
-                            {isGenerating ? 'Generating…' : 'Generate'}
+                            {isGeneratingThisDoc ? 'Generating…' : 'Generate'}
                           </Button>
                         )}
                         <span
@@ -253,6 +284,7 @@ export function ProgramDocumentChecklistPanel({
   projectId,
   programs,
   enableCptcGeneration = false,
+  enableAmpgGeneration = false,
 }: ProgramDocumentChecklistPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [checklists, setChecklists] = useState<
@@ -260,10 +292,12 @@ export function ProgramDocumentChecklistPanel({
   >({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingDocumentCode, setGeneratingDocumentCode] = useState<string | null>(
+    null,
+  );
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [generationWarnings, setGenerationWarnings] = useState<
-    CptcGenerationWarning[] | null
+    DocumentGenerationWarning[] | null
   >(null);
   const [lastGeneratedFileName, setLastGeneratedFileName] = useState<string | null>(
     null,
@@ -324,23 +358,36 @@ export function ProgramDocumentChecklistPanel({
     loadChecklists();
   }, [loadChecklists]);
 
-  const handleGenerateCptcBoc = useCallback(async () => {
-    setIsGenerating(true);
-    setGenerateError(null);
-    setGenerationWarnings(null);
-    setLastGeneratedFileName(null);
+  const handleGenerateDocument = useCallback(
+    async (documentCode: string) => {
+      setGeneratingDocumentCode(documentCode);
+      setGenerateError(null);
+      setGenerationWarnings(null);
+      setLastGeneratedFileName(null);
 
-    try {
-      const result = await generateCptcPartA(projectId);
-      setGenerationWarnings(result.warnings);
-      setLastGeneratedFileName(result.fileName);
-      await loadChecklists();
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : 'Failed to generate document');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [loadChecklists, projectId]);
+      try {
+        let result;
+        if (documentCode === CPTC_BOC_DOCUMENT_CODE) {
+          result = await generateCptcPartA(projectId);
+        } else if (documentCode === AMPG_SPEND_SUMMARY_DOCUMENT_CODE) {
+          result = await generateAmpgAbSpendSummary(projectId);
+        } else if (documentCode === AMPG_LABOUR_SUMMARY_DOCUMENT_CODE) {
+          result = await generateAmpgAbLabourSummary(projectId);
+        } else {
+          throw new Error(`Unsupported document code: ${documentCode}`);
+        }
+
+        setGenerationWarnings(result.warnings);
+        setLastGeneratedFileName(result.fileName);
+        await loadChecklists();
+      } catch (err) {
+        setGenerateError(err instanceof Error ? err.message : 'Failed to generate document');
+      } finally {
+        setGeneratingDocumentCode(null);
+      }
+    },
+    [loadChecklists, projectId],
+  );
 
   if (applicablePrograms.length === 0) {
     return null;
@@ -351,6 +398,8 @@ export function ProgramDocumentChecklistPanel({
     if (!checklist) return `${program.programCode}: …`;
     return `${program.programCode}: ${checklist.fulfilledRequiredCount}/${checklist.requiredCount} required`;
   });
+
+  const canGenerateDocuments = enableCptcGeneration || enableAmpgGeneration;
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white">
@@ -373,9 +422,7 @@ export function ProgramDocumentChecklistPanel({
       {isExpanded && (
         <div className="space-y-4 border-t border-gray-100 px-5 py-4">
           <p className="text-xs text-gray-500">
-            {enableCptcGeneration
-              ? 'Upload documents from the Documents tab, or generate CAVCO Part A Breakdown of Costs from a locked budget.'
-              : 'Upload documents from the Documents tab; matching is based on document type and project uploads.'}
+            {checklistHelpText(enableCptcGeneration, enableAmpgGeneration)}
           </p>
 
           {generateError && (
@@ -435,10 +482,13 @@ export function ProgramDocumentChecklistPanel({
                   checklist={checklist}
                   programName={program.programName}
                   enableCptcGeneration={enableCptcGeneration}
-                  isGenerating={isGenerating}
-                  onGenerateCptcBoc={
-                    enableCptcGeneration && program.programCode === 'CPTC'
-                      ? handleGenerateCptcBoc
+                  enableAmpgGeneration={enableAmpgGeneration}
+                  generatingDocumentCode={generatingDocumentCode}
+                  onGenerateDocument={
+                    canGenerateDocuments &&
+                    ((enableCptcGeneration && program.programCode === 'CPTC') ||
+                      (enableAmpgGeneration && program.programCode === 'AMPG'))
+                      ? handleGenerateDocument
                       : undefined
                   }
                 />

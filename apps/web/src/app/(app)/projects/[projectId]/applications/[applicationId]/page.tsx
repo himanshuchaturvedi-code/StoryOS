@@ -220,6 +220,7 @@ export default function FundingApplicationDetailPage({
           projectId={projectId}
           programs={[{ programCode, programName }]}
           enableCptcGeneration={programCode === 'CPTC'}
+          enableAmpgGeneration={programCode === 'AMPG'}
         />
       </div>
     </div>
