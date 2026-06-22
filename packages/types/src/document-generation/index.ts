@@ -48,3 +48,5 @@ export interface CptcPartADocument {
   warnings: DocumentWarning[];
   generatedAt: Date;
 }
+
+export * from './boc-registry';

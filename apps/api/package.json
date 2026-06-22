@@ -18,6 +18,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.15",
     "@storyos/database": "*",
+    "@storyos/program-registry": "*",
     "@storyos/types": "*",
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
@@ -50,6 +51,7 @@
     },
     "moduleNameMapper": {
       "^@storyos/database(.*)$": "<rootDir>/../../../packages/database/src$1",
+      "^@storyos/program-registry(.*)$": "<rootDir>/../../../packages/program-registry/src$1",
       "^@storyos/types(.*)$": "<rootDir>/../../../packages/types/src$1"
     },
     "testEnvironment": "node"
