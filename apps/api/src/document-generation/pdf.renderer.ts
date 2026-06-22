@@ -99,6 +99,15 @@ export async function renderCptcPartAPdf(
   });
   y -= 12;
 
+  page.drawText(`Budget: ${doc.budgetVersionName} (LOCKED)`, {
+    x: startX,
+    y,
+    size: 8,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+  y -= 12;
+
   page.drawText(
     `Generated: ${doc.generatedAt.toISOString().slice(0, 10)}`,
     { x: startX, y, size: 7, font, color: rgb(0.4, 0.4, 0.4) },

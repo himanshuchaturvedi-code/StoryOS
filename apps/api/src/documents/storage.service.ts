@@ -61,4 +61,24 @@ export class StorageService {
   async getDownloadUrl(key: string, expiresInSeconds = 3600): Promise<string> {
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}?presigned-stub=true&expires=${expiresInSeconds}`;
   }
+
+  /**
+   * Stores generated document bytes server-side.
+   * Phase 1 stub — logs and no-ops until real S3 SDK is wired (Phase 3).
+   */
+  async putObject(
+    key: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<void> {
+    if (this.endpoint) {
+      this.logger.warn(
+        `Real S3 putObject is not yet implemented (Phase 3). key=${key}, bytes=${body.length}, type=${contentType}`,
+      );
+      return;
+    }
+    this.logger.debug(
+      `Storage putObject stub: key=${key}, bytes=${body.length}, type=${contentType}`,
+    );
+  }
 }

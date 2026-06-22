@@ -137,6 +137,8 @@ export function mapCptcPartA(data: CptcPartAData): CptcPartADocument {
   return {
     documentType: 'CPTC_PART_A',
     projectTitle: data.project.title,
+    budgetVersionId: data.budgetVersionId,
+    budgetVersionName: data.budgetVersionName,
     rows,
     summary,
     warnings,

@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TenantModule } from '../tenant/tenant.module';
+import { DocumentsModule } from '../documents/documents.module';
 import { DocumentGenerationController } from './document-generation.controller';
 import { DocumentGenerationService } from './document-generation.service';
 import { CptcPartACollector } from './cptc-part-a.collector';
 
 @Module({
-  imports: [PrismaModule, TenantModule],
+  imports: [PrismaModule, TenantModule, DocumentsModule],
   controllers: [DocumentGenerationController],
   providers: [DocumentGenerationService, CptcPartACollector],
 })

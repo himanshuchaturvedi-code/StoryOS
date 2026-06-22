@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { CptcPartADocument, DocumentWarning } from '@storyos/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantAwareService } from '../tenant/tenant-aware.service';
 import { TenantContext } from '../tenant/tenant.context';
+import { StorageService } from '../documents/storage.service';
+import { assertValidProgramDocumentTag } from '../documents/program-document-tag.validation';
 import { CptcPartACollector } from './cptc-part-a.collector';
 import { mapCptcPartA } from './cptc-part-a.mapper';
 import { renderCptcPartAPdf } from './pdf.renderer';
+
+export const CPTC_BOC_PROGRAM_CODE = 'CPTC';
+export const CPTC_BOC_DOCUMENT_CODE = 'CAVCO_PART_A';
 
 export interface GenerateDocumentResult {
   documentId: string;
@@ -21,6 +26,7 @@ export class DocumentGenerationService extends TenantAwareService {
     prisma: PrismaService,
     tenant: TenantContext,
     private readonly collector: CptcPartACollector,
+    private readonly storage: StorageService,
   ) {
     super(prisma, tenant);
   }
@@ -36,9 +42,24 @@ export class DocumentGenerationService extends TenantAwareService {
     const pdfBuffer = await renderCptcPartAPdf(mapped);
 
     const fileName = `CPTC_Part_A_BOC_${sanitize(data.project.title)}_${dateStamp()}.pdf`;
+    const documentId = crypto.randomUUID();
+    const storageKey = this.storage.buildKey({
+      organizationId: this.organizationId,
+      projectId,
+      documentId,
+      fileName,
+    });
+
+    const tags = assertValidProgramDocumentTag(
+      CPTC_BOC_PROGRAM_CODE,
+      CPTC_BOC_DOCUMENT_CODE,
+    );
+
+    await this.storage.putObject(storageKey, pdfBuffer, 'application/pdf');
 
     const doc = await this.prisma.document.create({
       data: {
+        id: documentId,
         organizationId: this.organizationId,
         projectId,
         uploadedById: this.tenant.userId!,
@@ -46,8 +67,10 @@ export class DocumentGenerationService extends TenantAwareService {
         fileName,
         fileType: 'application/pdf',
         fileSize: pdfBuffer.length,
-        storageKey: `generated/${this.organizationId}/${projectId}/${fileName}`,
+        storageKey,
         category: 'CAVCO_PART_A',
+        programCode: tags.programCode,
+        programDocumentCode: tags.programDocumentCode,
       },
     });
 

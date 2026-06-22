@@ -41,6 +41,8 @@ export interface BocSummary {
 export interface CptcPartADocument {
   documentType: 'CPTC_PART_A';
   projectTitle: string;
+  budgetVersionId: string;
+  budgetVersionName: string;
   rows: BocRow[];
   summary: BocSummary;
   warnings: DocumentWarning[];
